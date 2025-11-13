@@ -1,32 +1,62 @@
+import Link from 'next/link';
 import { useState } from 'react';
 import { apiPost, setAuthToken } from '../lib/api';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [msg, setMsg] = useState('');
-  const submit = async (e) => {
-    e.preventDefault();
-    setMsg('');
+  const [message, setMessage] = useState('');
+
+  const submit = async (event) => {
+    event.preventDefault();
+    setMessage('');
     try {
       const { token } = await apiPost('/api/auth/login', { email, password });
       setAuthToken(token);
-      window.location.href = '/dashboard';
-    } catch (e) {
-      setMsg('Error: ' + (e.message || 'Failed'));
+      window.location.href = '/swipe';
+    } catch (error) {
+      setMessage('Error: ' + (error.message || 'Login failed'));
     }
   };
+
   return (
-    <div>
-      <h2>Login</h2>
-      <form onSubmit={submit} style={{ display: 'grid', gap: 8, maxWidth: 320 }}>
-        <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
-        <input placeholder="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-        <button type="submit">Login</button>
-      </form>
-      {msg && <p style={{ marginTop: 8 }}>{msg}</p>}
-    </div>
+    <section className="auth-shell">
+      <div className="auth-card">
+        <h1>Log in and keep swiping</h1>
+        <p className="subtle-text">Access your matches, chats, and the latest likes on your profile.</p>
+
+        <form onSubmit={submit} className="auth-form">
+          <label>
+            <span>Email</span>
+            <input
+              placeholder="you@campus.edu"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+          </label>
+          <label>
+            <span>Password</span>
+            <input
+              placeholder="••••••••"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </label>
+          <button type="submit" className="primary-btn">
+            Log in
+          </button>
+        </form>
+
+        {message && <p className={`feedback ${message.startsWith('Error') ? 'error' : ''}`}>{message}</p>}
+
+        <p className="support-link">
+          Don’t have an account? <Link href="/register">Sign up here</Link>.
+        </p>
+      </div>
+    </section>
   );
 }
-
-

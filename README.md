@@ -1,276 +1,282 @@
-## Campus Dating MVP (Web) - No Compass Feature
+# Campus Dating App
 
-Minimal, secure campus dating MVP with email/password auth, student ID + selfie verification, admin review workflow, and simple dashboards. Web-first, deployable on free tiers (Vercel + Render + MongoDB Atlas + Cloudinary).
+A modern dating app designed for college students to find study partners and meaningful connections.
 
-### Features
-- Email + password authentication (register, login).
-- Verification upload: college ID photo + selfie with ID (+ optional profile photo).
-- Admin review workflow: Approve, Request Re-upload, Decline (+ audit log).
-- Limited access for pending users; locked on re-upload request/decline.
-- Basic rate limits on auth and uploads, file type/size checks.
-- Nodemailer emails (Ethereal for dev; Gmail SMTP optional).
-- Clean, minimal UI with status banner, upload previews, and admin panel.
+## 🚀 Features
 
-### Tech Stack
-- Frontend: Next.js (React). Deploy on Vercel.
-- Backend: Node.js + Express, JWT auth. Deploy on Render or Railway.
-- Database: MongoDB Atlas (free tier).
-- Storage: Cloudinary (free tier).
-- Email: Nodemailer (Ethereal for dev) or Gmail SMTP.
+- **Profile Creation**: Multi-step registration with photo uploads and verification
+- **Smart Matching**: Swipe-based matching with filters (gender, age, department, etc.)
+- **Like System**: Like profiles and match when there's mutual interest
+- **Real-time Chat**: Message your matches with text, voice notes, images, and videos
+- **Admin Panel**: Comprehensive admin dashboard for user management and moderation
+- **Verification System**: Photo ID and selfie verification for safety
 
----
+## 📋 Prerequisites
 
-## Monorepo Layout
+Before deploying, ensure you have:
+
+- **Node.js** (v18 or higher)
+- **MongoDB** database (MongoDB Atlas for production)
+- **Cloudinary** account for image storage
+- **GitHub** account
+- **Vercel** account (for frontend)
+- **Railway/Render/Railway** account (for backend) or any Node.js hosting
+
+## 🛠️ Tech Stack
+
+- **Frontend**: Next.js 14, React, CSS
+- **Backend**: Node.js, Express.js
+- **Database**: MongoDB with Mongoose
+- **Storage**: Cloudinary for images
+- **Authentication**: JWT tokens
+
+## 📁 Project Structure
+
 ```
-backend/
-  src/
-    server.js
-    config.js
-    db.js
-    middleware/
-    models/
-    routes/
-    services/
-    scripts/seedAdmin.js
-  package.json
-  env.example
-frontend/
-  src/
-    pages/
-    components/
-    lib/api.js
-  package.json
-  next.config.js
-  env.local.example
+campus-dating/
+├── frontend/          # Next.js frontend application
+├── backend/           # Express.js backend API
+├── .env.example       # Environment variables template
+└── README.md          # This file
 ```
 
----
+## ⚙️ Environment Variables
 
-## Environment Variables
+### Backend (.env)
 
-Copy these examples and create local `.env` files:
+Create a `.env` file in the `backend` directory:
 
-- Backend: create `backend/.env` based on `backend/env.example`
-- Frontend: create `frontend/.env.local` based on `frontend/env.local.example`
-
-Backend `env.example` (copy to `backend/.env`):
-```
-MONGO_URI=mongodb+srv://<user>:<pass>@<cluster>/<db>?retryWrites=true&w=majority
-JWT_SECRET=change_this_in_production
+```env
+PORT=5000
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/campus-dating
+JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+JWT_EXPIRES_IN=7d
 FRONTEND_URL=http://localhost:3000
-BACKEND_URL=http://localhost:4000
-NODE_ENV=development
-
-CLOUDINARY_CLOUD_NAME=
-CLOUDINARY_API_KEY=
-CLOUDINARY_API_SECRET=
-
-# Gmail SMTP for dev (or leave blank to auto-use Ethereal test inbox)
-SMTP_USER=
-SMTP_PASS=
-# SENDGRID_API_KEY=   # optional if you prefer SendGrid
-
-# Admin seeding (auto-created on backend boot if provided)
+CLOUDINARY_CLOUD_NAME=your-cloudinary-name
+CLOUDINARY_API_KEY=your-cloudinary-api-key
+CLOUDINARY_API_SECRET=your-cloudinary-api-secret
 ADMIN_EMAIL=admin@example.com
-ADMIN_PASSWORD=StrongPassword123
+ADMIN_PASSWORD=secure-admin-password
+NODE_ENV=production
 ```
 
-Frontend `env.local.example` (copy to `frontend/.env.local`):
+### Frontend (.env.local)
+
+Create a `.env.local` file in the `frontend` directory:
+
+```env
+NEXT_PUBLIC_API_URL=https://your-backend-url.railway.app
 ```
-NEXT_PUBLIC_BACKEND_URL=http://localhost:4000
+
+For local development:
+```env
+NEXT_PUBLIC_API_URL=http://localhost:5000
 ```
 
----
+## 🚀 Deployment Steps
 
-## Local Development
+### Step 1: Prepare Your Repository
 
-1) Clone repo
+1. **Initialize Git** (if not already done):
+   ```bash
+   git init
+   git add .
+   git commit -m "Initial commit"
+   ```
 
-2) Backend
-```
+2. **Create GitHub Repository**:
+   - Go to GitHub and create a new repository
+   - Don't initialize with README (we already have one)
+
+3. **Push to GitHub**:
+   ```bash
+   git remote add origin https://github.com/your-username/campus-dating.git
+   git branch -M main
+   git push -u origin main
+   ```
+
+### Step 2: Deploy Backend
+
+#### Option A: Railway (Recommended)
+
+1. **Create Railway Account**:
+   - Go to [railway.app](https://railway.app)
+   - Sign up with GitHub
+
+2. **Create New Project**:
+   - Click "New Project"
+   - Select "Deploy from GitHub repo"
+   - Choose your repository
+   - Select the `backend` folder as the root
+
+3. **Configure Environment Variables**:
+   - Go to "Variables" tab
+   - Add all environment variables from your `.env` file
+   - **Important**: Update `FRONTEND_URL` to your Vercel URL (get this after deploying frontend)
+
+4. **Deploy**:
+   - Railway will auto-detect Node.js
+   - It will run `npm install` and `npm start`
+   - Wait for deployment to complete
+   - Copy the deployment URL (e.g., `https://your-app.railway.app`)
+
+#### Option B: Render
+
+1. **Create Render Account**: [render.com](https://render.com)
+
+2. **Create New Web Service**:
+   - Connect your GitHub repository
+   - Set root directory to `backend`
+   - Build command: `npm install`
+   - Start command: `npm start`
+   - Add environment variables
+
+3. **Get Backend URL**: Copy the URL after deployment
+
+### Step 3: Deploy Frontend to Vercel
+
+1. **Create Vercel Account**:
+   - Go to [vercel.com](https://vercel.com)
+   - Sign up with GitHub
+
+2. **Import Project**:
+   - Click "Add New Project"
+   - Import your GitHub repository
+   - Set framework preset to "Next.js"
+   - Set root directory to `frontend`
+
+3. **Configure Environment Variables**:
+   - Go to "Environment Variables"
+   - Add: `NEXT_PUBLIC_API_URL` = your backend URL from Step 2
+   - Example: `https://your-app.railway.app`
+
+4. **Deploy**:
+   - Click "Deploy"
+   - Wait for deployment
+   - Copy your frontend URL (e.g., `https://campus-dating.vercel.app`)
+
+### Step 4: Update Backend Frontend URL
+
+1. **Go back to Railway/Render**:
+   - Update `FRONTEND_URL` environment variable
+   - Set it to your Vercel URL
+   - Redeploy backend (or it will auto-redeploy)
+
+2. **Update CORS Settings**:
+   - Backend should already have CORS configured
+   - Verify it accepts requests from your Vercel domain
+
+### Step 5: Update Frontend API URL
+
+1. **Go to Vercel Dashboard**:
+   - Project → Settings → Environment Variables
+   - Verify `NEXT_PUBLIC_API_URL` is set correctly
+   - Redeploy if needed
+
+## 🔧 Local Development Setup
+
+### Backend Setup
+
+```bash
 cd backend
-cp env.example .env
 npm install
-npm run dev
+cp .env.example .env
+# Edit .env with your values
+npm start
 ```
-The server runs on `http://localhost:4000`.
 
-3) Frontend
-```
+Backend will run on `http://localhost:5000`
+
+### Frontend Setup
+
+```bash
 cd frontend
-cp env.local.example .env.local
 npm install
+cp .env.example .env.local
+# Edit .env.local with your values
 npm run dev
 ```
-The app runs on `http://localhost:3000`.
 
-4) Create Admin Account
-- Option A (automatic): set `ADMIN_EMAIL` and `ADMIN_PASSWORD` in `backend/.env`; server seeds/updates admin on boot.
-- Option B (manual script):
-```
-cd backend
-npm run seed:admin
-```
+Frontend will run on `http://localhost:3000`
 
----
+## 📝 Important Notes
 
-## API Spec
+### Security
 
-Base URL: `BACKEND_URL` (e.g., `http://localhost:4000`)
+- **Never commit `.env` files** to Git
+- Use strong JWT secrets in production
+- Use secure admin passwords
+- Enable HTTPS in production
 
-- POST `/api/auth/register` `{ email, password }`
-  - Creates user with `verification_status="pending"`, `access_level="limited"`.
-- POST `/api/auth/login` `{ email, password }`
-  - Returns `{ token }` (JWT). Use as `Authorization: Bearer <token>`.
-- GET `/api/auth/me`
-  - Returns current user profile; requires auth.
-- POST `/api/user/profile` `{ name, college, year, bio }`
-  - Create/edit profile; requires auth.
-- POST `/api/user/upload-id` multipart/form-data
-  - Fields: `id_photo` (required), `selfie_photo` (required), `profile_photo` (optional)
-  - Saves to Cloudinary; sets `verification_status="pending"`, `access_level="limited"`.
-  - Enforced: mime types (jpeg/png/webp); max size 5MB; rate limit (3 per 30 mins).
-- GET `/api/admin/pending`
-  - Lists users with status `pending` or `reupload_required`; admin only.
-- POST `/api/admin/approve` `{ userId, note }`
-  - Sets `verification_status="approved"`, `access_level="full"`; admin only; sends email; logs audit.
-- POST `/api/admin/request-reupload` `{ userId, note }`
-  - Sets `verification_status="reupload_required"`, `access_level="locked"`; admin only; sends email; logs audit.
-- POST `/api/admin/decline` `{ userId, note }`
-  - Sets `verification_status="declined"`, `access_level="locked"`; admin only; sends email; logs audit.
-- GET `/api/admin/audit-log`
-  - Returns recent audit log entries; admin only.
+### Database
 
-JWT: 7 day expiry; signed with `JWT_SECRET`.
+- Use MongoDB Atlas for production (free tier available)
+- Backup your database regularly
+- Set up database indexes for performance
 
----
+### Admin Access
 
-## Database Schema
+- Admin user is auto-created on first deployment
+- Use credentials from `ADMIN_EMAIL` and `ADMIN_PASSWORD`
+- Access admin panel at `/admin`
 
-User
-```
-{
-  _id, email, passwordHash,
-  name, college, year, bio,
-  photos: [{ url, publicId, kind: 'profile'|'id'|'selfie' }],
-  id_photo_url, id_photo_public_id,
-  selfie_url, selfie_public_id,
-  verification_status: 'pending'|'reupload_required'|'approved'|'declined',
-  access_level: 'limited'|'full'|'locked',
-  admin_note,
-  isAdmin: boolean,
-  createdAt, updatedAt
-}
-```
+## 🐛 Troubleshooting
 
-AuditLog
-```
-{
-  _id, userId, adminId,
-  action: 'approve' | 'request_reupload' | 'decline',
-  note, timestamp
-}
-```
+### Chat Not Working
 
----
+- Verify backend is deployed and accessible
+- Check `NEXT_PUBLIC_API_URL` is correct in Vercel
+- Check browser console for errors
+- Verify MongoDB connection
 
-## Admin Flow
+### Images Not Uploading
 
-- Approve: user becomes `approved` + `full` access.
-- Request Re-upload: user becomes `reupload_required` + `locked`; user must reupload, then returns to `pending` + `limited` on submission.
-- Decline: user becomes `declined` + `locked` (admin can later approve manually if you choose to add such UI).
+- Verify Cloudinary credentials
+- Check file size limits (max 5MB)
+- Verify CORS settings
 
-All actions create audit log entries and attempt to email the user.
+### Matches Not Showing
 
----
+- Verify users are verified (`verification_status: 'approved'`)
+- Check that users have mutual likes
+- Verify database queries are working
 
-## Deploy Instructions
+## 📞 Support
 
-### MongoDB Atlas (free tier)
-1) Create free cluster at `https://www.mongodb.com/atlas`.
-2) Create a DB user and password.
-3) Network: allow access from anywhere (0.0.0.0/0) or use IP allow list / Cloud access.
-4) Get connection string; put into `MONGO_URI`.
+For issues or questions:
+1. Check the troubleshooting section
+2. Review backend logs in Railway/Render
+3. Check browser console for frontend errors
+4. Verify all environment variables are set correctly
 
-### Cloudinary (free tier)
-1) Create account at `https://cloudinary.com/`.
-2) Get `cloud name`, `API key`, `API secret`.
-3) Put into backend `.env` as `CLOUDINARY_*` values.
+## 📄 License
 
-### Backend on Render (free tier)
-1) Push this repo to GitHub.
-2) Create a new Web Service on Render from your repo.
-3) Runtime: Node. Build Command: `cd backend && npm install`. Start Command: `cd backend && npm start`.
-4) Set Environment Variables in Render dashboard (from `backend/env.example`).
-5) Deploy. Note the public URL (e.g., `https://your-api.onrender.com`). Set `FRONTEND_URL` accordingly.
+This project is private and proprietary.
 
-Alternative: Railway (similar steps — set vars, point to `backend`).
+## 🔐 Environment Variables Checklist
 
-### Frontend on Vercel
-1) Create Vercel account and import the repo.
-2) Framework: Next.js. Root directory: `frontend`.
-3) Environment variable: `NEXT_PUBLIC_BACKEND_URL` -> use Render backend URL.
-4) Deploy.
+Before deploying, ensure you have:
 
-### Logs
-- Render backend logs: in Render dashboard.
-- Vercel frontend logs: in Vercel dashboard.
+- [ ] MongoDB connection string
+- [ ] JWT secret (strong random string)
+- [ ] Cloudinary credentials (cloud name, API key, API secret)
+- [ ] Admin email and password
+- [ ] Frontend URL (after Vercel deployment)
+- [ ] Backend URL (after Railway/Render deployment)
+
+## 🎯 Quick Deploy Checklist
+
+1. [ ] Push code to GitHub
+2. [ ] Set up MongoDB Atlas database
+3. [ ] Set up Cloudinary account
+4. [ ] Deploy backend to Railway/Render
+5. [ ] Get backend URL
+6. [ ] Deploy frontend to Vercel
+7. [ ] Add `NEXT_PUBLIC_API_URL` to Vercel
+8. [ ] Update `FRONTEND_URL` in backend
+9. [ ] Test deployment
+10. [ ] Access admin panel and verify users
 
 ---
 
-## Emails
-
-By default, in development (no SMTP creds), the backend uses Ethereal (test inbox). When sending email, the console prints a preview URL (copy/paste to view the email).
-
-For simple Gmail SMTP for dev:
-- Set `SMTP_USER` and `SMTP_PASS` (app password recommended).
-
-For SendGrid:
-- Optionally set up and use SMTP/API and adjust the transporter as needed.
-
----
-
-## Security Notes and Retention
-
-- Passwords: hashed with bcrypt (12 rounds).
-- JWT: 7d expiration; store token in `localStorage` (MVP). For production, consider httpOnly cookies.
-- Rate limits: auth endpoints and upload attempts limited.
-- Upload validation: enforce file type and 5MB max size.
-- Retention suggestions:
-  - Remove raw ID/selfie images after a retention period (e.g., 90 days) or once approved if policy permits.
-  - Store only needed metadata in DB; do not store PII beyond business needs.
-  - Allow users to request deletion of verification images after approval if compliant with your policies.
-- Location: no compass/proximity feature implemented.
-
----
-
-## Troubleshooting
-
-- 401/403 errors: ensure you are logged in and using the Bearer token.
-- CORS issues: set `FRONTEND_URL` to your deployed frontend URL in backend env.
-- Upload failures: verify Cloudinary credentials and file size/type limits.
-- Emails not received: in dev, check console for Ethereal preview URL; for Gmail SMTP, ensure app password and less secure app settings as required.
-
----
-
-## After Deploy Checklist
-
-1) Set backend env vars on Render (MONGO_URI, JWT_SECRET, FRONTEND_URL, BACKEND_URL, CLOUDINARY_*, ADMIN_EMAIL/PASSWORD).
-2) Deploy backend and confirm `GET /api/health` returns `{ ok: true }`.
-3) Set frontend env on Vercel: `NEXT_PUBLIC_BACKEND_URL` = your backend URL.
-4) Deploy frontend.
-5) Create/verify admin account (auto-seeded or run `npm run seed:admin` in backend).
-6) Sign up a test user, login, upload ID + selfie (+ optional profile photo).
-7) In Admin dashboard: Approve or Request Re-upload; verify user status updates.
-8) Confirm email notifications (Ethereal preview/Gmail inbox).
-
----
-
-## Notes
-
-- Ambiguities resolved with safe defaults: locked users can only access upload page and basic auth; no chat implemented.
-- Admin can later unlock by Approve action; decline persists as locked until an admin changes status (UI provided for approve only).
-
-Happy building!
-
-
+**Good luck with your deployment! 🚀**

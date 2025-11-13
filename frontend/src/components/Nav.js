@@ -4,34 +4,61 @@ import { apiGet } from '../lib/api';
 
 export default function Nav() {
   const [me, setMe] = useState(null);
+
   useEffect(() => {
     apiGet('/api/auth/me')
       .then(setMe)
       .catch(() => setMe(null));
   }, []);
+
   const logout = () => {
     localStorage.removeItem('token');
     window.location.href = '/';
   };
+
   return (
-    <nav style={{ display: 'flex', gap: 12, padding: 12, borderBottom: '1px solid #eee' }}>
-      <Link href="/">Home</Link>
-      {!me && (
-        <>
-          <Link href="/register">Register</Link>
-          <Link href="/login">Login</Link>
-        </>
-      )}
-      {me && (
-        <>
-          <Link href="/dashboard">Dashboard</Link>
-          <Link href="/upload">Upload</Link>
-          {me.isAdmin && <Link href="/admin">Admin</Link>}
-          <button onClick={logout} style={{ marginLeft: 'auto' }}>Logout</button>
-        </>
-      )}
+    <nav className="top-nav">
+      <div className="nav-left">
+        <Link href="/" className="brand">
+          Campus Dating
+        </Link>
+        <div className="nav-links">
+          <Link href="/" className="nav-link">
+            Discover
+          </Link>
+          {me && (
+            <Link href="/dashboard" className="nav-link">
+              Dashboard
+            </Link>
+          )}
+          {me && (
+            <Link href="/upload" className="nav-link">
+              Verify
+            </Link>
+          )}
+          {me?.isAdmin && (
+            <Link href="/admin" className="nav-link">
+              Admin
+            </Link>
+          )}
+        </div>
+      </div>
+      <div className="nav-right">
+        {!me ? (
+          <>
+            <Link href="/login" className="nav-btn ghost">
+              Log in
+            </Link>
+            <Link href="/register" className="nav-btn">
+              Sign up
+            </Link>
+          </>
+        ) : (
+          <button type="button" className="nav-btn ghost" onClick={logout}>
+            Log out
+          </button>
+        )}
+      </div>
     </nav>
   );
 }
-
-

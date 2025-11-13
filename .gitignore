@@ -1,12 +1,60 @@
-node_modules
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Environment variables
 .env
 .env.local
 .env.development.local
+.env.test.local
 .env.production.local
-.next
-dist
+*.env
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+.vercel/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
 .DS_Store
-npm-debug.log*
-yarn-error.log*
+Thumbs.db
 
+# Logs
+logs/
+*.log
 
+# Testing
+coverage/
+.nyc_output/
+
+# Misc
+*.pem
+.cache/
+
+# Sensitive/Internal documentation
+CHAT_UPDATE_GUIDE.md
+DEPLOYMENT.md
+NOTES.md
+*.md
+!README.md
+
+# Database
+*.db
+*.sqlite
+
+# Temporary files
+tmp/
+temp/
+*.tmp

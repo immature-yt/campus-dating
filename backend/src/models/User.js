@@ -9,14 +9,32 @@ const PhotoSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const PromptSchema = new mongoose.Schema(
+  {
+    prompt: { type: String, required: true },
+    answer: { type: String, required: true }
+  },
+  { _id: false }
+);
+
 const UserSchema = new mongoose.Schema(
   {
     email: { type: String, required: true, unique: true, index: true },
     passwordHash: { type: String, required: true },
     name: { type: String },
+    gender: {
+      type: String,
+      enum: ['male', 'female', 'non_binary', 'prefer_not_to_say', 'other'],
+      required: false
+    },
+    age: { type: Number, min: 18, max: 120 },
     college: { type: String },
+    state: { type: String },
+    city: { type: String },
+    department: { type: String },
     year: { type: String },
     bio: { type: String },
+    prompts: [PromptSchema],
     photos: [PhotoSchema],
     id_photo_url: { type: String },
     id_photo_public_id: { type: String },
@@ -35,7 +53,11 @@ const UserSchema = new mongoose.Schema(
       index: true
     },
     admin_note: { type: String },
-    isAdmin: { type: Boolean, default: false }
+    isAdmin: { type: Boolean, default: false },
+    isBlocked: { type: Boolean, default: false },
+    blockedAt: { type: Date },
+    blockedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    blockReason: { type: String }
   },
   { timestamps: true }
 );

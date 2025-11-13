@@ -14,6 +14,16 @@ export async function requireAuth(req, res, next) {
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
+    
+    // Check if user is blocked
+    if (user.isBlocked && !user.isAdmin) {
+      return res.status(403).json({ 
+        error: 'Account blocked', 
+        message: 'Your account has been blocked. Please contact support.',
+        blockReason: user.blockReason 
+      });
+    }
+    
     req.user = user;
     next();
   } catch (err) {

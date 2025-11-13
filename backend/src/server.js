@@ -7,6 +7,9 @@ import { config } from './config.js';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/user.js';
 import adminRoutes from './routes/admin.js';
+import matchRoutes from './routes/match.js';
+import likesRoutes from './routes/likes.js';
+import messagesRoutes from './routes/messages.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 import { User } from './models/User.js';
 import bcrypt from 'bcryptjs';
@@ -53,6 +56,9 @@ async function bootstrap() {
   app.use('/api/auth', authRoutes);
   app.use('/api/user', userRoutes);
   app.use('/api/admin', adminRoutes);
+  app.use('/api/match', matchRoutes);
+  app.use('/api/likes', likesRoutes);
+  app.use('/api/messages', messagesRoutes);
 
   app.use(notFound);
   app.use(errorHandler);

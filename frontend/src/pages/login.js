@@ -11,11 +11,22 @@ export default function Login() {
     event.preventDefault();
     setMessage('');
     try {
+      console.log('Attempting login...');
       const { token } = await apiPost('/api/auth/login', { email, password });
       setAuthToken(token);
       window.location.href = '/swipe';
     } catch (error) {
-      setMessage('Error: ' + (error.message || 'Login failed'));
+      console.error('Login error:', error);
+      const errorMsg = error.message || 'Login failed';
+      
+      // More helpful error messages
+      if (errorMsg.includes('Failed to connect')) {
+        setMessage('Error: Cannot reach backend server. Please check your connection or contact support.');
+      } else if (errorMsg.includes('Invalid credentials')) {
+        setMessage('Error: Invalid email or password. Please try again.');
+      } else {
+        setMessage('Error: ' + errorMsg);
+      }
     }
   };
 

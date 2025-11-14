@@ -709,12 +709,26 @@ export default function Chats() {
 
   if (chatId) {
     const chat = messages.find((m) => m.id === chatId);
+    // Handle photos - can be array of objects with url property or array of strings
+    let chatPhoto = null;
+    if (chat?.photos && chat.photos.length > 0) {
+      const firstPhoto = chat.photos[0];
+      chatPhoto = typeof firstPhoto === 'string' ? firstPhoto : (firstPhoto?.url || null);
+    }
+    
     return (
       <div className="chat-page">
         <div className="chat-header">
           <button type="button" className="back-btn" onClick={() => router.push('/chats')}>
-            ← Back
+            ←
           </button>
+          {chatPhoto ? (
+            <img src={chatPhoto} alt={chat?.name || 'User'} className="chat-header-avatar" />
+          ) : (
+            <div className="chat-header-avatar chat-header-avatar-placeholder">
+              {chat?.name?.charAt(0)?.toUpperCase() || '?'}
+            </div>
+          )}
           <h2>{chat?.name || 'Chat'}</h2>
         </div>
         <div className="chat-messages">
@@ -743,14 +757,24 @@ export default function Chats() {
                 <div 
                   className="message-menu-wrapper"
                   onMouseEnter={() => setHoveredMessageId(msg.id)}
-                  onMouseLeave={() => setHoveredMessageId(null)}
+                  onMouseLeave={(e) => {
+                    // Only hide if mouse is not moving to the button
+                    const relatedTarget = e.relatedTarget;
+                    if (!relatedTarget || !relatedTarget.closest('.message-menu-wrapper')) {
+                      setHoveredMessageId(null);
+                    }
+                  }}
                 >
                   {hoveredMessageId === msg.id && (
                     <div className="message-menu">
                       <button
                         type="button"
                         className="message-menu-btn"
-                        onClick={() => handleReply(msg)}
+                        onClick={() => {
+                          handleReply(msg);
+                          setHoveredMessageId(null);
+                        }}
+                        onMouseEnter={() => setHoveredMessageId(msg.id)}
                         aria-label="Reply"
                       >
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">

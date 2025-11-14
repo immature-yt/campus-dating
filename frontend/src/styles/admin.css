@@ -104,10 +104,12 @@
 
 .pending-info > div {
   margin-bottom: 0.75rem;
+  color: #2a2a2a;
 }
 
 .pending-info strong {
-  color: #12151c;
+  color: #000000;
+  font-weight: 700;
 }
 
 .status-badge {
@@ -277,6 +279,7 @@
 .users-table td {
   padding: 0.875rem;
   border-bottom: 1px solid #f0f0f0;
+  color: #1a1a1a;
 }
 
 .users-table tr.blocked-user {
@@ -376,6 +379,11 @@
   transition: all 0.2s;
 }
 
+.chat-preview strong {
+  color: #000000;
+  font-weight: 600;
+}
+
 .chat-preview:hover {
   background: #ffe5ee;
   border-color: #ef446c;
@@ -420,7 +428,8 @@
 
 .message-header {
   margin-bottom: 0.5rem;
-  color: #12151c;
+  color: #000000;
+  font-weight: 600;
 }
 
 .message-content {
@@ -481,7 +490,8 @@
 
 .log-action {
   margin-bottom: 0.5rem;
-  color: #12151c;
+  color: #000000;
+  font-weight: 600;
 }
 
 .log-details {

@@ -43,12 +43,11 @@ coverage/
 *.pem
 .cache/
 
-# Sensitive/Internal documentation
+# Sensitive/Internal documentation (exclude all .md except README)
 CHAT_UPDATE_GUIDE.md
-DEPLOYMENT.md
 NOTES.md
-*.md
-!README.md
+PRIVATE.md
+# Keep DEPLOYMENT_ENV_VARS.md as it's needed for deployment
 
 # Database
 *.db

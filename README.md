@@ -62,16 +62,19 @@ NODE_ENV=production
 
 ### Frontend (.env.local)
 
-Create a `.env.local` file in the `frontend` directory:
+**⚠️ IMPORTANT**: For production, set this in **Vercel Environment Variables**, not in `.env.local` file!
 
+In Vercel → Settings → Environment Variables:
 ```env
 NEXT_PUBLIC_API_URL=https://your-backend-url.railway.app
 ```
 
-For local development:
+For local development only, create `.env.local`:
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:5000
 ```
+
+**Note**: The `.env.local` file is gitignored and should NOT be committed!
 
 ## 🚀 Deployment Steps
 
@@ -111,8 +114,21 @@ NEXT_PUBLIC_API_URL=http://localhost:5000
 
 3. **Configure Environment Variables**:
    - Go to "Variables" tab
-   - Add all environment variables from your `.env` file
-   - **Important**: Update `FRONTEND_URL` to your Vercel URL (get this after deploying frontend)
+   - **CRITICAL**: Add ALL required environment variables (see checklist below)
+   - **Important**: You MUST set all variables here, not in files!
+   - Set `FRONTEND_URL` to your Vercel URL (get this after deploying frontend)
+   - See `DEPLOYMENT_ENV_VARS.md` for complete list
+
+**Required Variables for Railway:**
+- `PORT` (usually 5000)
+- `MONGO_URI` (MongoDB Atlas connection string)
+- `JWT_SECRET` (strong random string, min 32 chars)
+- `FRONTEND_URL` (your Vercel URL)
+- `CLOUDINARY_CLOUD_NAME`
+- `CLOUDINARY_API_KEY`
+- `CLOUDINARY_API_SECRET`
+- `ADMIN_EMAIL`
+- `ADMIN_PASSWORD`
 
 4. **Deploy**:
    - Railway will auto-detect Node.js
@@ -146,9 +162,11 @@ NEXT_PUBLIC_API_URL=http://localhost:5000
    - Set root directory to `frontend`
 
 3. **Configure Environment Variables**:
-   - Go to "Environment Variables"
-   - Add: `NEXT_PUBLIC_API_URL` = your backend URL from Step 2
+   - Go to "Settings" → "Environment Variables"
+   - Add: `NEXT_PUBLIC_API_URL` = your Railway backend URL from Step 2
    - Example: `https://your-app.railway.app`
+   - **Important**: Select all environments (Production, Preview, Development)
+   - **Redeploy** after adding environment variable!
 
 4. **Deploy**:
    - Click "Deploy"

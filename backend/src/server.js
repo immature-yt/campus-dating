@@ -42,6 +42,20 @@ async function bootstrap() {
 
   const app = express();
   
+  // Root route - helpful info
+  app.get('/', (req, res) => {
+    res.json({
+      message: 'Campus Dating API',
+      status: 'running',
+      endpoints: {
+        health: '/api/health',
+        auth: '/api/auth/login, /api/auth/register',
+        docs: 'This is an API backend. Visit /api/health to check server status.'
+      },
+      timestamp: new Date().toISOString()
+    });
+  });
+  
   // Health check - place BEFORE helmet and cors for reliability
   app.get('/api/health', (req, res) => {
     console.log('Health check hit');
@@ -49,12 +63,30 @@ async function bootstrap() {
   });
 
   app.use(helmet());
-  app.use(
-    cors({
-      origin: config.frontendUrl || '*',
-      credentials: false
-    })
-  );
+  
+  // CORS configuration - handle origins with/without trailing slashes
+  const corsOptions = {
+    origin: function (origin, callback) {
+      // Allow requests with no origin (mobile apps, curl, Postman)
+      if (!origin) return callback(null, true);
+      
+      // Normalize origin (remove trailing slash)
+      const normalizedOrigin = origin.replace(/\/+$/, '');
+      const normalizedFrontendUrl = (config.frontendUrl || '').replace(/\/+$/, '');
+      
+      // Allow exact match or wildcard
+      if (normalizedOrigin === normalizedFrontendUrl || config.frontendUrl === '*') {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: false,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  };
+  
+  app.use(cors(corsOptions));
   app.use(express.json({ limit: '2mb' }));
   app.use(morgan('dev'));
 

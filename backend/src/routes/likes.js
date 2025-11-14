@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import { requireAuth } from '../middleware/auth.js';
 import { Like } from '../models/Like.js';
 import { User } from '../models/User.js';
@@ -15,14 +16,22 @@ router.post('/send', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'toUserId is required' });
     }
 
-    if (toUserId === req.user._id.toString()) {
+    // Convert toUserId to ObjectId
+    let toUserObjectId;
+    try {
+      toUserObjectId = new mongoose.Types.ObjectId(toUserId);
+    } catch (error) {
+      return res.status(400).json({ error: 'Invalid toUserId format' });
+    }
+
+    if (toUserObjectId.toString() === req.user._id.toString()) {
       return res.status(400).json({ error: 'Cannot like yourself' });
     }
 
     // Check if already liked
     const existingLike = await Like.findOne({
       fromUser: req.user._id,
-      toUser: toUserId
+      toUser: toUserObjectId
     });
 
     if (existingLike) {
@@ -34,14 +43,14 @@ router.post('/send', requireAuth, async (req, res) => {
 
     // Check if the other user already liked this user
     const reciprocalLike = await Like.findOne({
-      fromUser: toUserId,
+      fromUser: toUserObjectId,
       toUser: req.user._id
     });
 
     // Create the like
     const like = await Like.create({
       fromUser: req.user._id,
-      toUser: toUserId,
+      toUser: toUserObjectId,
       status: reciprocalLike ? 'matched' : 'pending'
     });
 
@@ -55,13 +64,13 @@ router.post('/send', requireAuth, async (req, res) => {
         userId: req.user._id,
         adminId: null,
         action: 'match_created',
-        note: `Matched with user ${toUserId}`
+        note: `Matched with user ${toUserObjectId}`
       });
 
       return res.json({ 
         message: 'It\'s a match!', 
         isMatch: true,
-        matchedUser: await User.findById(toUserId).select('name email photos verification_status')
+        matchedUser: await User.findById(toUserObjectId).select('name email photos verification_status')
       });
     }
 
@@ -94,13 +103,18 @@ router.get('/sent', requireAuth, async (req, res) => {
 // Get likes received by current user (people who liked you)
 router.get('/received', requireAuth, async (req, res) => {
   try {
+    const userId = req.user._id;
+    
+    // Find likes where current user is the recipient and status is pending
     const likes = await Like.find({
-      toUser: req.user._id,
+      toUser: userId,
       status: 'pending'
     })
       .populate('fromUser', 'name email age gender college department photos verification_status')
       .sort({ createdAt: -1 });
 
+    console.log(`Found ${likes.length} received likes for user ${userId}`);
+    
     return res.json({ likes });
   } catch (error) {
     console.error('Error fetching received likes:', error);

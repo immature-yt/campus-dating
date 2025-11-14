@@ -2,23 +2,6 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { apiGet, apiPost } from '../lib/api';
 
-function safeParse(storageKey, fallback) {
-  if (typeof window === 'undefined') return fallback;
-  try {
-    const raw = localStorage.getItem(storageKey);
-    if (!raw) return fallback;
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : fallback;
-  } catch (error) {
-    return fallback;
-  }
-}
-
-function persistList(storageKey, value) {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(storageKey, JSON.stringify(value));
-  }
-}
 
 export default function Chats() {
   const router = useRouter();
@@ -86,16 +69,20 @@ export default function Chats() {
     try {
       const response = await apiGet(`/api/messages/${userId}`);
       const messages = response.messages || [];
-      const formattedMessages = messages.map(msg => ({
-        id: msg._id,
-        type: msg.messageType || 'text',
-        text: msg.content,
-        audioUrl: msg.messageType === 'voice' ? msg.mediaUrl : null,
-        imageUrl: msg.messageType === 'image' ? msg.mediaUrl : null,
-        videoUrl: msg.messageType === 'video' ? msg.mediaUrl : null,
-        timestamp: msg.createdAt,
-        sender: msg.fromUser.toString() === me._id.toString() ? 'me' : 'other'
-      }));
+      const formattedMessages = messages.map(msg => {
+        const fromUserId = typeof msg.fromUser === 'object' ? msg.fromUser._id : msg.fromUser;
+        const isFromMe = fromUserId?.toString() === me._id?.toString();
+        return {
+          id: msg._id,
+          type: msg.messageType || 'text',
+          text: msg.content,
+          audioUrl: msg.messageType === 'voice' ? msg.mediaUrl : null,
+          imageUrl: msg.messageType === 'image' ? msg.mediaUrl : null,
+          videoUrl: msg.messageType === 'video' ? msg.mediaUrl : null,
+          timestamp: msg.createdAt,
+          sender: isFromMe ? 'me' : 'other'
+        };
+      });
       setChatMessages(formattedMessages);
     } catch (error) {
       console.error('Error loading messages:', error);

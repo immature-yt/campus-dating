@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import { requireAuth } from '../middleware/auth.js';
 import { Message } from '../models/Message.js';
 import { Like } from '../models/Like.js';
@@ -68,12 +69,20 @@ router.get('/:userId', requireAuth, async (req, res) => {
   try {
     const { userId } = req.params;
 
+    // Convert userId to ObjectId
+    let userObjectId;
+    try {
+      userObjectId = new mongoose.Types.ObjectId(userId);
+    } catch (error) {
+      return res.status(400).json({ error: 'Invalid userId format' });
+    }
+
     // Verify they have a match
     const match = await Like.findOne({
       status: 'matched',
       $or: [
-        { fromUser: req.user._id, toUser: userId },
-        { fromUser: userId, toUser: req.user._id }
+        { fromUser: req.user._id, toUser: userObjectId },
+        { fromUser: userObjectId, toUser: req.user._id }
       ]
     });
 
@@ -84,16 +93,18 @@ router.get('/:userId', requireAuth, async (req, res) => {
     // Get all messages
     const messages = await Message.find({
       $or: [
-        { fromUser: req.user._id, toUser: userId },
-        { fromUser: userId, toUser: req.user._id }
+        { fromUser: req.user._id, toUser: userObjectId },
+        { fromUser: userObjectId, toUser: req.user._id }
       ]
     })
+      .populate('fromUser', 'name email photos')
+      .populate('toUser', 'name email photos')
       .sort({ createdAt: 1 })
       .limit(500);
 
     // Mark messages as read
     await Message.updateMany(
-      { fromUser: userId, toUser: req.user._id, isRead: false },
+      { fromUser: userObjectId, toUser: req.user._id, isRead: false },
       { isRead: true, readAt: new Date() }
     );
 
@@ -113,12 +124,20 @@ router.post('/send', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'toUserId and content are required' });
     }
 
+    // Convert toUserId to ObjectId
+    let toUserObjectId;
+    try {
+      toUserObjectId = new mongoose.Types.ObjectId(toUserId);
+    } catch (error) {
+      return res.status(400).json({ error: 'Invalid toUserId format' });
+    }
+
     // Verify they have a match
     const match = await Like.findOne({
       status: 'matched',
       $or: [
-        { fromUser: req.user._id, toUser: toUserId },
-        { fromUser: toUserId, toUser: req.user._id }
+        { fromUser: req.user._id, toUser: toUserObjectId },
+        { fromUser: toUserObjectId, toUser: req.user._id }
       ]
     });
 
@@ -129,11 +148,17 @@ router.post('/send', requireAuth, async (req, res) => {
     // Create message
     const message = await Message.create({
       fromUser: req.user._id,
-      toUser: toUserId,
+      toUser: toUserObjectId,
       content,
       messageType,
       mediaUrl: mediaUrl || null
     });
+
+    // Populate user info before returning
+    await message.populate('fromUser', 'name email photos');
+    await message.populate('toUser', 'name email photos');
+
+    console.log(`Message sent: fromUser=${req.user._id}, toUser=${toUserObjectId}`);
 
     return res.json({ message });
   } catch (error) {

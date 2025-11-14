@@ -43,6 +43,11 @@ export default function Chats() {
   useEffect(() => {
     if (chatId && me) {
       loadChatMessages(chatId);
+      // Set up auto-refresh every 3 seconds
+      const interval = setInterval(() => {
+        loadChatMessages(chatId);
+      }, 3000);
+      return () => clearInterval(interval);
     }
   }, [chatId, me]);
 
@@ -67,11 +72,16 @@ export default function Chats() {
 
   const loadChatMessages = async (userId) => {
     try {
+      if (!userId || !me) return;
+      
       const response = await apiGet(`/api/messages/${userId}`);
       const messages = response.messages || [];
       const formattedMessages = messages.map(msg => {
         const fromUserId = typeof msg.fromUser === 'object' ? msg.fromUser._id : msg.fromUser;
-        const isFromMe = fromUserId?.toString() === me._id?.toString();
+        const fromUserIdStr = fromUserId?.toString();
+        const myIdStr = me._id?.toString();
+        const isFromMe = fromUserIdStr === myIdStr;
+        
         return {
           id: msg._id,
           type: msg.messageType || 'text',
@@ -86,7 +96,7 @@ export default function Chats() {
       setChatMessages(formattedMessages);
     } catch (error) {
       console.error('Error loading messages:', error);
-      setChatMessages([]);
+      // Don't set empty array on error, keep existing messages
     }
   };
 
@@ -170,10 +180,14 @@ export default function Chats() {
         messageType: 'text'
       });
       setInputText('');
-      // Reload messages
+      // Reload messages immediately
       await loadChatMessages(chatId);
       // Reload conversations to update preview
       await loadConversations();
+      // Scroll to bottom after sending
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
     } catch (error) {
       console.error('Error sending message:', error);
       alert('Failed to send message');

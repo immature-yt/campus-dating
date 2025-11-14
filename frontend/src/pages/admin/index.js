@@ -60,10 +60,55 @@ export default function Admin() {
     setUsersTotalPages(data.pages);
   };
 
-  // Load chats
+  // Load chats - get unique conversation pairs
   const loadChats = async () => {
-    const data = await apiGet('/api/admin/chats?limit=100');
-    setChats(data.messages);
+    try {
+      const data = await apiGet('/api/admin/chats?limit=500');
+      // Group messages by user pairs to show conversations
+      const conversationMap = new Map();
+      
+      data.messages.forEach(msg => {
+        const fromId = typeof msg.fromUser === 'object' ? msg.fromUser._id : msg.fromUser;
+        const toId = typeof msg.toUser === 'object' ? msg.toUser._id : msg.toUser;
+        
+        // Create a consistent key for the conversation pair
+        const key = [fromId, toId].sort().join('_');
+        
+        if (!conversationMap.has(key)) {
+          conversationMap.set(key, {
+            user1: typeof msg.fromUser === 'object' ? msg.fromUser : { _id: fromId, name: 'Loading...', email: '' },
+            user2: typeof msg.toUser === 'object' ? msg.toUser : { _id: toId, name: 'Loading...', email: '' },
+            lastMessage: msg,
+            messageCount: 0
+          });
+        }
+        
+        const conv = conversationMap.get(key);
+        conv.messageCount += 1;
+        if (new Date(msg.createdAt) > new Date(conv.lastMessage.createdAt)) {
+          conv.lastMessage = msg;
+        }
+      });
+      
+      const conversations = Array.from(conversationMap.values());
+      conversations.sort((a, b) => new Date(b.lastMessage.createdAt) - new Date(a.lastMessage.createdAt));
+      setChats(conversations);
+    } catch (error) {
+      console.error('Error loading chats:', error);
+      setChats([]);
+    }
+  };
+
+  // Load chat between two users
+  const loadChatBetweenUsers = async (user1Id, user2Id) => {
+    try {
+      const data = await apiGet(`/api/admin/chats/${user1Id}/${user2Id}`);
+      setChatMessages(data.messages || []);
+      setSelectedChat(data);
+    } catch (error) {
+      console.error('Error loading chat:', error);
+      alert('Failed to load chat');
+    }
   };
 
   // Load stats
@@ -336,41 +381,80 @@ export default function Admin() {
       {activeTab === 'chats' && (
         <div className="admin-section">
           <h2>Chat Monitoring</h2>
-          <p className="note">Note: Currently showing recent messages from local storage. Real-time DB messages will appear here once users start chatting.</p>
           
           {!selectedChat ? (
             <div className="chats-list">
-              <h3>Recent Messages</h3>
+              <h3>Conversations ({chats.length})</h3>
               {chats.length === 0 ? (
-                <p>No messages yet</p>
+                <p>No conversations yet. Users need to match first to start chatting.</p>
               ) : (
                 <div className="chat-previews">
-                  {chats.map((msg, idx) => (
-                    <div key={idx} className="chat-preview" onClick={() => viewChat(msg.fromUser._id, msg.toUser._id)}>
-                      <div>
-                        <strong>{msg.fromUser?.name || msg.fromUser?.email}</strong> → <strong>{msg.toUser?.name || msg.toUser?.email}</strong>
+                  {chats.map((conv, idx) => {
+                    const user1Id = typeof conv.user1 === 'object' ? conv.user1._id : conv.user1;
+                    const user2Id = typeof conv.user2 === 'object' ? conv.user2._id : conv.user2;
+                    return (
+                      <div 
+                        key={idx} 
+                        className="chat-preview" 
+                        onClick={() => loadChatBetweenUsers(user1Id, user2Id)}
+                      >
+                        <div className="chat-users">
+                          <strong>{conv.user1?.name || conv.user1?.email || 'User 1'}</strong> ↔ 
+                          <strong>{conv.user2?.name || conv.user2?.email || 'User 2'}</strong>
+                        </div>
+                        <div className="chat-content">
+                          {conv.lastMessage?.content?.substring(0, 100) || 
+                           (conv.lastMessage?.messageType === 'voice' ? '🎤 Voice note' : 
+                           conv.lastMessage?.messageType === 'image' ? '🖼️ Image' :
+                           conv.lastMessage?.messageType === 'video' ? '🎥 Video' : 
+                           'Message')}
+                        </div>
+                        <div className="chat-meta">
+                          <span>{conv.messageCount} message{conv.messageCount !== 1 ? 's' : ''}</span>
+                          <span className="chat-time">{new Date(conv.lastMessage?.createdAt).toLocaleString()}</span>
+                        </div>
                       </div>
-                      <div className="chat-content">{msg.content?.substring(0, 100) || msg.messageType}</div>
-                      <div className="chat-time">{new Date(msg.createdAt).toLocaleString()}</div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
           ) : (
             <div className="chat-detail">
-              <button onClick={() => setSelectedChat(null)} className="back-btn-small">← Back to list</button>
-              <h3>Chat between {selectedChat.users.user1?.name} and {selectedChat.users.user2?.name}</h3>
+              <button onClick={() => { setSelectedChat(null); setChatMessages([]); }} className="back-btn-small">
+                ← Back to conversations
+              </button>
+              <h3>Chat between {selectedChat.users?.user1?.name || selectedChat.users?.user1?.email || 'User 1'} and {selectedChat.users?.user2?.name || selectedChat.users?.user2?.email || 'User 2'}</h3>
               <div className="messages-list">
-                {chatMessages.map((msg, idx) => (
-                  <div key={idx} className="message-item">
-                    <div className="message-header">
-                      <strong>{msg.fromUser?.name}</strong> → {msg.toUser?.name}
-                    </div>
-                    <div className="message-content">{msg.content}</div>
-                    <div className="message-time">{new Date(msg.createdAt).toLocaleString()}</div>
-                  </div>
-                ))}
+                {chatMessages.length === 0 ? (
+                  <p>No messages in this conversation.</p>
+                ) : (
+                  chatMessages.map((msg, idx) => {
+                    const fromUser = typeof msg.fromUser === 'object' ? msg.fromUser : { name: 'User', email: '' };
+                    const toUser = typeof msg.toUser === 'object' ? msg.toUser : { name: 'User', email: '' };
+                    
+                    return (
+                      <div key={idx} className="message-item">
+                        <div className="message-header">
+                          <strong>{fromUser?.name || fromUser?.email}</strong> → {toUser?.name || toUser?.email}
+                          <span className="message-type">({msg.messageType || 'text'})</span>
+                        </div>
+                        <div className="message-content">
+                          {msg.messageType === 'image' && msg.mediaUrl ? (
+                            <img src={msg.mediaUrl} alt="Shared image" style={{ maxWidth: '300px', maxHeight: '300px' }} />
+                          ) : msg.messageType === 'video' && msg.mediaUrl ? (
+                            <video src={msg.mediaUrl} controls style={{ maxWidth: '300px', maxHeight: '300px' }} />
+                          ) : msg.messageType === 'voice' && msg.mediaUrl ? (
+                            <audio src={msg.mediaUrl} controls />
+                          ) : (
+                            msg.content
+                          )}
+                        </div>
+                        <div className="message-time">{new Date(msg.createdAt).toLocaleString()}</div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           )}

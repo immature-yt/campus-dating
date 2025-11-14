@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { User } from '../models/User.js';
 import { AuditLog } from '../models/AuditLog.js';
@@ -273,18 +274,27 @@ router.get('/chats/:user1Id/:user2Id', requireAuth, requireAdmin, async (req, re
   try {
     const { user1Id, user2Id } = req.params;
     
+    // Convert to ObjectId
+    let user1ObjectId, user2ObjectId;
+    try {
+      user1ObjectId = new mongoose.Types.ObjectId(user1Id);
+      user2ObjectId = new mongoose.Types.ObjectId(user2Id);
+    } catch (error) {
+      return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+    
     const messages = await Message.find({
       $or: [
-        { fromUser: user1Id, toUser: user2Id },
-        { fromUser: user2Id, toUser: user1Id }
+        { fromUser: user1ObjectId, toUser: user2ObjectId },
+        { fromUser: user2ObjectId, toUser: user1ObjectId }
       ]
     })
-      .populate('fromUser', 'name email')
-      .populate('toUser', 'name email')
+      .populate('fromUser', 'name email photos')
+      .populate('toUser', 'name email photos')
       .sort({ createdAt: 1 });
     
-    const user1 = await User.findById(user1Id).select('name email');
-    const user2 = await User.findById(user2Id).select('name email');
+    const user1 = await User.findById(user1ObjectId).select('name email photos');
+    const user2 = await User.findById(user2ObjectId).select('name email photos');
     
     return res.json({
       users: { user1, user2 },

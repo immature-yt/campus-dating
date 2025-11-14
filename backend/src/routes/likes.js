@@ -54,6 +54,8 @@ router.post('/send', requireAuth, async (req, res) => {
       status: reciprocalLike ? 'matched' : 'pending'
     });
 
+    console.log(`Like created: fromUser=${req.user._id}, toUser=${toUserObjectId}, status=${like.status}`);
+
     // If reciprocal like exists, update it to matched
     if (reciprocalLike) {
       reciprocalLike.status = 'matched';
@@ -160,9 +162,17 @@ router.post('/like-back', requireAuth, async (req, res) => {
   try {
     const { fromUserId } = req.body;
 
+    // Convert fromUserId to ObjectId
+    let fromUserObjectId;
+    try {
+      fromUserObjectId = new mongoose.Types.ObjectId(fromUserId);
+    } catch (error) {
+      return res.status(400).json({ error: 'Invalid fromUserId format' });
+    }
+
     // Find the like from them to you
     const theirLike = await Like.findOne({
-      fromUser: fromUserId,
+      fromUser: fromUserObjectId,
       toUser: req.user._id,
       status: 'pending'
     });
@@ -177,8 +187,8 @@ router.post('/like-back', requireAuth, async (req, res) => {
 
     // Create or update your like to them
     const yourLike = await Like.findOneAndUpdate(
-      { fromUser: req.user._id, toUser: fromUserId },
-      { fromUser: req.user._id, toUser: fromUserId, status: 'matched' },
+      { fromUser: req.user._id, toUser: fromUserObjectId },
+      { fromUser: req.user._id, toUser: fromUserObjectId, status: 'matched' },
       { upsert: true, new: true }
     );
 
@@ -187,13 +197,13 @@ router.post('/like-back', requireAuth, async (req, res) => {
       userId: req.user._id,
       adminId: null,
       action: 'match_created',
-      note: `Matched with user ${fromUserId}`
+      note: `Matched with user ${fromUserObjectId}`
     });
 
     return res.json({ 
       message: 'It\'s a match!', 
       isMatch: true,
-      matchedUser: await User.findById(fromUserId).select('name email photos verification_status')
+      matchedUser: await User.findById(fromUserObjectId).select('name email photos verification_status')
     });
   } catch (error) {
     console.error('Error liking back:', error);
@@ -206,9 +216,17 @@ router.post('/pass', requireAuth, async (req, res) => {
   try {
     const { fromUserId } = req.body;
 
+    // Convert fromUserId to ObjectId
+    let fromUserObjectId;
+    try {
+      fromUserObjectId = new mongoose.Types.ObjectId(fromUserId);
+    } catch (error) {
+      return res.status(400).json({ error: 'Invalid fromUserId format' });
+    }
+
     // Find and update the like
     await Like.findOneAndUpdate(
-      { fromUser: fromUserId, toUser: req.user._id, status: 'pending' },
+      { fromUser: fromUserObjectId, toUser: req.user._id, status: 'pending' },
       { status: 'rejected' }
     );
 

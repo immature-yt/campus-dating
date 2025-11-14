@@ -17,8 +17,9 @@ async function sampleApprovedUser({ college, excludeId, gender, minAge, maxAge, 
   };
 
   // Only add college filter if college is provided
+  // Use case-insensitive partial match for more flexibility
   if (trimmed) {
-    matchStage.college = { $regex: new RegExp(`^${escapeRegExp(trimmed)}$`, 'i') };
+    matchStage.college = { $regex: new RegExp(escapeRegExp(trimmed), 'i') };
   }
   
   // Exclude specific user IDs
@@ -64,6 +65,15 @@ async function sampleApprovedUser({ college, excludeId, gender, minAge, maxAge, 
   
   console.log('Match query filters:', JSON.stringify(matchStage, null, 2));
 
+  // First, check how many users match the criteria
+  const count = await User.countDocuments(matchStage);
+  console.log(`Found ${count} users matching criteria`);
+
+  if (count === 0) {
+    console.log('No users found matching the criteria');
+    return null;
+  }
+
   const [match] = await User.aggregate([
     { $match: matchStage },
     { $sample: { size: 1 } },
@@ -83,6 +93,12 @@ async function sampleApprovedUser({ college, excludeId, gender, minAge, maxAge, 
       }
     }
   ]);
+
+  if (match) {
+    console.log(`Selected match: ${match._id} - ${match.name} from ${match.college}`);
+  } else {
+    console.log('No match selected from aggregation');
+  }
 
   return match || null;
 }
@@ -186,7 +202,7 @@ router.get('/find', requireAuth, async (req, res) => {
     }
 
     // If no matches found, try without college restriction (if there are other approved users)
-    console.log('No matches found with college filter, trying broader search...');
+    console.log('No matches found with college filter, trying broader search without college restriction...');
     const broadMatch = await sampleApprovedUser({
       excludeId,
       excludeIds,
@@ -199,12 +215,46 @@ router.get('/find', requireAuth, async (req, res) => {
     });
 
     if (broadMatch) {
-      console.log(`Found match without college filter: ${broadMatch._id}`);
+      console.log(`Found match without college filter: ${broadMatch._id} from ${broadMatch.college}`);
       return res.json({ match: formatMatch(broadMatch), fallback: true });
     }
 
+    // Last resort: try with minimal filters (only approved and not blocked)
+    console.log('Trying minimal filter search (only approved, not blocked)...');
+    const minimalMatch = await sampleApprovedUser({
+      excludeId,
+      excludeIds,
+      gender: null,
+      minAge: null,
+      maxAge: null,
+      department: null,
+      verifiedOnly: null,
+      college: null
+    });
+
+    if (minimalMatch) {
+      console.log(`Found match with minimal filters: ${minimalMatch._id} from ${minimalMatch.college}`);
+      return res.json({ match: formatMatch(minimalMatch), fallback: true });
+    }
+
+    // Check total approved users count for debugging
+    const totalApproved = await User.countDocuments({ 
+      verification_status: 'approved', 
+      isBlocked: { $ne: true } 
+    });
+    const excludedCount = excludeIds.length + (excludeId ? 1 : 0);
+    console.log(`Total approved users in database: ${totalApproved}`);
+    console.log(`Excluding ${excludedCount} users`);
+
     console.log('No matches found at all');
-    return res.status(404).json({ error: 'No matches found' });
+    return res.status(404).json({ 
+      error: 'No matches found',
+      debug: {
+        totalApprovedUsers: totalApproved,
+        excludedUsers: excludedCount,
+        requestedCollege: college
+      }
+    });
   } catch (error) {
     console.error('Match error:', error);
     return res.status(500).json({ error: 'Failed to find match' });

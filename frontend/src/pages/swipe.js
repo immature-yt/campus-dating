@@ -132,12 +132,19 @@ export default function Swipe() {
       const skippedUsers = safeParse('campus-dating-skipped-users', []);
       // ALWAYS exclude own profile - use multiple formats to be sure
       const myIds = [me._id, me._id?.toString(), me.id, me.id?.toString()].filter(Boolean);
-      const excludeUsers = [...new Set([...likedUsers, ...skippedUsers, ...myIds])];
+      const excludeUsers = [...new Set([...likedUsers, ...skippedUsers, ...myIds])]
+        .filter(id => id && id.toString().trim() !== ''); // Filter out empty/invalid IDs
 
       const params = new URLSearchParams({ 
-        college: me.college,
-        exclude: excludeUsers.join(',')
+        college: me.college
       });
+      
+      // Only add exclude parameter if there are users to exclude
+      if (excludeUsers.length > 0) {
+        params.append('exclude', excludeUsers.join(','));
+      }
+      
+      console.log('Excluding users:', excludeUsers);
       
       // Always apply filters if they are set (not default values)
       const hasFilters = useFilters || 
@@ -190,16 +197,41 @@ export default function Swipe() {
         setMatchError('No matches found. Try again later!');
       }
     } catch (error) {
-      const errorMsg = parseErrorMessage(error);
       console.error('Error fetching match:', error);
+      
+      // Try to parse error response as JSON
+      let errorData = {};
+      let errorMsg = 'Unable to find matches. Please try again.';
+      
+      try {
+        // The error message might be a JSON string
+        const errorText = error?.message || error?.toString() || '';
+        errorData = JSON.parse(errorText);
+        errorMsg = errorData.error || errorText;
+      } catch (parseErr) {
+        // If not JSON, use the error message as-is
+        errorMsg = error?.message || error?.toString() || 'Unable to find matches. Please try again.';
+      }
       
       // Check if user needs to be approved
       if (errorMsg.includes('approved') || errorMsg.includes('verification')) {
         setMatchError('Your account must be approved before you can see matches. Please wait for admin approval.');
-      } else if (errorMsg.includes('No matches found') || errorMsg === 'No matches found') {
-        setMatchError('No matches found. Try adjusting your filters or check back later!');
+      } else if (errorMsg.includes('No matches found') || errorData.error === 'No matches found') {
+        // Check if there's debug info in the error response
+        if (errorData.debug) {
+          const { totalApprovedUsers, excludedUsers } = errorData.debug;
+          if (totalApprovedUsers === 0) {
+            setMatchError('No approved users found yet. Please check back later once more users join!');
+          } else if (totalApprovedUsers === excludedUsers) {
+            setMatchError('You\'ve seen all available matches! Check back later for new users.');
+          } else {
+            setMatchError(`No matches found with current filters. Try adjusting your filters or check back later! (${totalApprovedUsers} approved users available)`);
+          }
+        } else {
+          setMatchError('No matches found. Try adjusting your filters or check back later!');
+        }
       } else {
-        setMatchError(errorMsg || 'Unable to find matches. Please try again.');
+        setMatchError(errorMsg);
       }
     } finally {
       setIsFindingMatch(false);

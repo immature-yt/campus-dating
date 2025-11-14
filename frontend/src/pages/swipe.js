@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import StatusBanner from '../components/StatusBanner';
-import { apiGet } from '../lib/api';
+import { apiGet, apiPost } from '../lib/api';
 
 const HISTORY_STORAGE_KEY = 'campus-dating-match-history';
 const HISTORY_LIMIT = 20;
@@ -191,7 +191,16 @@ export default function Swipe() {
       }
     } catch (error) {
       const errorMsg = parseErrorMessage(error);
-      setMatchError(errorMsg || 'Unable to find matches. Please try again.');
+      console.error('Error fetching match:', error);
+      
+      // Check if user needs to be approved
+      if (errorMsg.includes('approved') || errorMsg.includes('verification')) {
+        setMatchError('Your account must be approved before you can see matches. Please wait for admin approval.');
+      } else if (errorMsg.includes('No matches found') || errorMsg === 'No matches found') {
+        setMatchError('No matches found. Try adjusting your filters or check back later!');
+      } else {
+        setMatchError(errorMsg || 'Unable to find matches. Please try again.');
+      }
     } finally {
       setIsFindingMatch(false);
     }

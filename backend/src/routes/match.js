@@ -12,9 +12,11 @@ function escapeRegExp(text) {
 async function sampleApprovedUser({ college, excludeId, gender, minAge, maxAge, department, verifiedOnly, excludeIds = [] }) {
   const trimmed = college?.trim();
   const matchStage = {
-    verification_status: 'approved'
+    verification_status: 'approved',
+    isBlocked: { $ne: true } // Exclude blocked users
   };
 
+  // Only add college filter if college is provided
   if (trimmed) {
     matchStage.college = { $regex: new RegExp(`^${escapeRegExp(trimmed)}$`, 'i') };
   }
@@ -129,6 +131,19 @@ router.get('/find', requireAuth, async (req, res) => {
     verifiedOnly 
   } = req.query;
 
+  // Check if the requesting user is approved
+  const requestingUser = await User.findById(req.user._id);
+  if (!requestingUser) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  if (requestingUser.verification_status !== 'approved') {
+    return res.status(403).json({ 
+      error: 'Your account must be approved before you can see matches',
+      verification_status: requestingUser.verification_status 
+    });
+  }
+
   if (!college) {
     return res.status(400).json({ error: 'college query parameter is required' });
   }
@@ -148,22 +163,47 @@ router.get('/find', requireAuth, async (req, res) => {
       verifiedOnly
     };
     
+    console.log(`Finding match for user ${req.user._id} (approved: ${requestingUser.verification_status}) with college: ${college}`);
+    
     const primaryMatch = await sampleApprovedUser(filters);
 
     if (primaryMatch) {
+      console.log(`Found match: ${primaryMatch._id} from ${primaryMatch.college}`);
       return res.json({ match: formatMatch(primaryMatch) });
     }
 
+    // Try secondary college if provided
     if (secondaryCollege) {
+      console.log(`No match in primary college, trying secondary: ${secondaryCollege}`);
       const secondaryMatch = await sampleApprovedUser({
         ...filters,
         college: secondaryCollege
       });
       if (secondaryMatch) {
+        console.log(`Found match in secondary college: ${secondaryMatch._id}`);
         return res.json({ match: formatMatch(secondaryMatch), fallback: true });
       }
     }
 
+    // If no matches found, try without college restriction (if there are other approved users)
+    console.log('No matches found with college filter, trying broader search...');
+    const broadMatch = await sampleApprovedUser({
+      excludeId,
+      excludeIds,
+      gender,
+      minAge,
+      maxAge,
+      department,
+      verifiedOnly,
+      college: null // Remove college restriction
+    });
+
+    if (broadMatch) {
+      console.log(`Found match without college filter: ${broadMatch._id}`);
+      return res.json({ match: formatMatch(broadMatch), fallback: true });
+    }
+
+    console.log('No matches found at all');
     return res.status(404).json({ error: 'No matches found' });
   } catch (error) {
     console.error('Match error:', error);

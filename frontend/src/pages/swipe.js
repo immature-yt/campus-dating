@@ -145,15 +145,7 @@ export default function Swipe() {
       }
       
       console.log('Excluding users:', excludeUsers);
-      
-      // Only apply filters if they are explicitly set (not default values)
-      // Don't apply age filters if they're at defaults (18-35)
-      const hasFilters = useFilters || 
-                        appliedFilters.interestedIn || 
-                        (appliedFilters.department && appliedFilters.department.trim() !== '') ||
-                        appliedFilters.showVerifiedOnly ||
-                        (appliedFilters.minAge && appliedFilters.minAge !== 18) ||
-                        (appliedFilters.maxAge && appliedFilters.maxAge !== 35);
+      console.log('User college:', me.college);
       
       // Only send non-default filters to backend
       if (appliedFilters.interestedIn) {
@@ -172,21 +164,8 @@ export default function Swipe() {
         params.append('verifiedOnly', 'true');
       }
       
-      console.log('Filter status:', {
-        hasFilters,
-        interestedIn: appliedFilters.interestedIn,
-        department: appliedFilters.department,
-        showVerifiedOnly: appliedFilters.showVerifiedOnly,
-        minAge: appliedFilters.minAge,
-        maxAge: appliedFilters.maxAge,
-        sendingAgeFilters: (appliedFilters.minAge && appliedFilters.minAge !== 18) || (appliedFilters.maxAge && appliedFilters.maxAge !== 35)
-      });
-      
-      console.log('Fetching match with filters:', {
-        hasFilters,
-        appliedFilters,
-        params: params.toString()
-      });
+      console.log('Request params:', params.toString());
+      console.log('Exclude count:', excludeUsers.length);
       
       const response = await apiGet(`/api/match/find?${params.toString()}`);
       if (response.match) {

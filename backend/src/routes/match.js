@@ -10,16 +10,18 @@ function escapeRegExp(text) {
 }
 
 async function sampleApprovedUser({ college, excludeId, gender, minAge, maxAge, department, verifiedOnly, excludeIds = [] }) {
-  const trimmed = college?.trim();
   const matchStage = {
     verification_status: 'approved',
     isBlocked: { $ne: true } // Exclude blocked users
   };
 
-  // Only add college filter if college is provided
+  // Only add college filter if college is provided and not null/undefined
   // Use case-insensitive partial match for more flexibility
-  if (trimmed) {
-    matchStage.college = { $regex: new RegExp(escapeRegExp(trimmed), 'i') };
+  if (college && typeof college === 'string') {
+    const trimmed = college.trim();
+    if (trimmed && trimmed !== 'null' && trimmed !== 'undefined') {
+      matchStage.college = { $regex: new RegExp(escapeRegExp(trimmed), 'i') };
+    }
   }
   
   // Exclude specific user IDs
@@ -208,12 +210,12 @@ router.get('/find', requireAuth, async (req, res) => {
     const broadMatch = await sampleApprovedUser({
       excludeId,
       excludeIds,
-      gender,
-      minAge,
-      maxAge,
-      department,
-      verifiedOnly,
-      college: null // Remove college restriction
+      gender: gender || undefined,
+      minAge: minAge || undefined,
+      maxAge: maxAge || undefined,
+      department: department || undefined,
+      verifiedOnly: verifiedOnly || undefined,
+      college: undefined // Remove college restriction
     });
 
     if (broadMatch) {
@@ -226,12 +228,12 @@ router.get('/find', requireAuth, async (req, res) => {
     const minimalMatch = await sampleApprovedUser({
       excludeId,
       excludeIds,
-      gender: null,
-      minAge: null,
-      maxAge: null,
-      department: null,
-      verifiedOnly: null,
-      college: null
+      gender: undefined,
+      minAge: undefined,
+      maxAge: undefined,
+      department: undefined,
+      verifiedOnly: undefined,
+      college: undefined
     });
 
     if (minimalMatch) {
@@ -244,9 +246,19 @@ router.get('/find', requireAuth, async (req, res) => {
       verification_status: 'approved', 
       isBlocked: { $ne: true } 
     });
+    
+    // Get list of all approved users for debugging
+    const allApprovedUsers = await User.find({
+      verification_status: 'approved',
+      isBlocked: { $ne: true }
+    }).select('_id name college email').limit(10);
+    
     const excludedCount = excludeIds.length + (excludeId ? 1 : 0);
     console.log(`Total approved users in database: ${totalApproved}`);
     console.log(`Excluding ${excludedCount} users`);
+    console.log(`ExcludeId: ${excludeId}`);
+    console.log(`ExcludeIds: ${excludeIds.join(', ')}`);
+    console.log(`Sample approved users:`, allApprovedUsers.map(u => ({ id: u._id, name: u.name, college: u.college })));
 
     console.log('No matches found at all');
     return res.status(404).json({ 
@@ -254,7 +266,10 @@ router.get('/find', requireAuth, async (req, res) => {
       debug: {
         totalApprovedUsers: totalApproved,
         excludedUsers: excludedCount,
-        requestedCollege: college
+        requestedCollege: college,
+        excludeId: excludeId?.toString(),
+        excludeIds: excludeIds,
+        sampleUsers: allApprovedUsers.map(u => ({ id: u._id.toString(), name: u.name, college: u.college }))
       }
     });
   } catch (error) {

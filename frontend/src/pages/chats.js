@@ -2,6 +2,125 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { apiGet, apiPost } from '../lib/api';
 
+// Custom Voice Note Player Component
+function VoiceNotePlayer({ audioUrl }) {
+  const audioRef = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const progressRef = useRef(null);
+
+  useEffect(() => {
+    if (!audioUrl) return;
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const updateTime = () => setCurrentTime(audio.currentTime);
+    const updateDuration = () => setDuration(audio.duration);
+    const handleEnded = () => {
+      setIsPlaying(false);
+      setCurrentTime(0);
+    };
+
+    audio.addEventListener('timeupdate', updateTime);
+    audio.addEventListener('loadedmetadata', updateDuration);
+    audio.addEventListener('ended', handleEnded);
+
+    return () => {
+      audio.removeEventListener('timeupdate', updateTime);
+      audio.removeEventListener('loadedmetadata', updateDuration);
+      audio.removeEventListener('ended', handleEnded);
+    };
+  }, [audioUrl]);
+
+  const togglePlayPause = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (isPlaying) {
+      audio.pause();
+    } else {
+      audio.play();
+    }
+    setIsPlaying(!isPlaying);
+  };
+
+  const handleProgressClick = (e) => {
+    const audio = audioRef.current;
+    if (!audio || !progressRef.current || duration === 0) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const rect = progressRef.current.getBoundingClientRect();
+    const clientX = e.clientX || (e.changedTouches && e.changedTouches[0]?.clientX) || 0;
+    const clickX = clientX - rect.left;
+    const width = rect.width;
+    const percentage = Math.max(0, Math.min(1, clickX / width));
+    audio.currentTime = percentage * duration;
+  };
+
+  const formatTime = (seconds) => {
+    if (isNaN(seconds)) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+  if (!audioUrl) {
+    return (
+      <div className="voice-note-player">
+        <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+          Voice note unavailable
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="voice-note-player">
+      <audio ref={audioRef} src={audioUrl} preload="metadata" />
+      <button 
+        type="button"
+        className="voice-play-btn" 
+        onClick={togglePlayPause}
+        aria-label={isPlaying ? 'Pause' : 'Play'}
+      >
+        {isPlaying ? (
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <rect x="3" y="2" width="2" height="8" fill="currentColor" />
+            <rect x="7" y="2" width="2" height="8" fill="currentColor" />
+          </svg>
+        ) : (
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M3 2L10 6L3 10V2Z" fill="currentColor" />
+          </svg>
+        )}
+      </button>
+      <div className="voice-progress-container">
+        <div 
+          ref={progressRef}
+          className="voice-progress-bar" 
+          onClick={handleProgressClick}
+          onTouchEnd={handleProgressClick}
+        >
+          <div 
+            className="voice-progress-fill" 
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        <div className="voice-time">
+          <span>{formatTime(currentTime)}</span>
+          <span className="voice-time-separator">/</span>
+          <span>{formatTime(duration)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 export default function Chats() {
   const router = useRouter();
@@ -288,8 +407,7 @@ export default function Chats() {
             <div key={msg.id} className={`message ${msg.sender === 'me' ? 'sent' : 'received'}`}>
               {msg.type === 'voice' && (
                 <div className="voice-message">
-                  <audio controls src={msg.audioUrl} />
-                  <span className="voice-label">Voice note</span>
+                  <VoiceNotePlayer audioUrl={msg.audioUrl} />
                 </div>
               )}
               {msg.type === 'text' && <p>{msg.text}</p>}

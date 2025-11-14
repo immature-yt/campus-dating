@@ -110,7 +110,13 @@ router.get('/:userId', requireAuth, async (req, res) => {
       .sort({ createdAt: 1 })
       .limit(500);
 
-    // Mark messages as read
+    // Mark messages as delivered (when recipient fetches messages)
+    await Message.updateMany(
+      { fromUser: userObjectId, toUser: req.user._id, isDelivered: false },
+      { isDelivered: true, deliveredAt: new Date() }
+    );
+
+    // Mark messages as read (when recipient views the conversation)
     await Message.updateMany(
       { fromUser: userObjectId, toUser: req.user._id, isRead: false },
       { isRead: true, readAt: new Date() }

@@ -237,7 +237,10 @@ export default function Chats() {
           timestamp: msg.createdAt,
           sender: isFromMe ? 'me' : 'other',
           replyTo: msg.replyTo ? (typeof msg.replyTo === 'object' ? msg.replyTo._id : msg.replyTo) : null,
-          replyToMessage: replyToMessage
+          replyToMessage: replyToMessage,
+          isDelivered: msg.isDelivered || false,
+          isRead: msg.isRead || false,
+          optimistic: false
         };
       });
       
@@ -264,6 +267,14 @@ export default function Chats() {
 
   const startRecording = async () => {
     try {
+      // Stop any existing recording first
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      }
+      
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       
@@ -272,15 +283,20 @@ export default function Chats() {
       if (!MediaRecorder.isTypeSupported(mimeType)) {
         mimeType = 'audio/mp4';
         if (!MediaRecorder.isTypeSupported(mimeType)) {
-          mimeType = ''; // Use default
+          mimeType = 'audio/ogg';
+          if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = ''; // Use default
+          }
         }
       }
       
-      const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const options = mimeType ? { mimeType } : {};
+      const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
       mediaRecorder.ondataavailable = (event) => {
+        console.log('Data available:', event.data.size, 'bytes');
         if (event.data && event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
@@ -293,42 +309,66 @@ export default function Chats() {
       };
 
       mediaRecorder.onstop = () => {
-        if (audioChunksRef.current.length === 0) {
+        console.log('Recording stopped. Chunks:', audioChunksRef.current.length);
+        const totalSize = audioChunksRef.current.reduce((sum, chunk) => sum + (chunk?.size || 0), 0);
+        console.log('Total size:', totalSize, 'bytes');
+        
+        setIsRecording(false);
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+        
+        if (audioChunksRef.current.length === 0 || totalSize === 0) {
           console.error('No audio data recorded');
           alert('No audio was recorded. Please try again.');
           if (streamRef.current) {
             streamRef.current.getTracks().forEach((track) => track.stop());
+            streamRef.current = null;
           }
+          audioChunksRef.current = [];
           return;
         }
         
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType || 'audio/webm' });
+        
+        console.log('Blob size:', audioBlob.size, 'bytes', 'Type:', audioBlob.type);
+        
         if (audioBlob.size === 0) {
           console.error('Empty audio blob');
           alert('Recording was empty. Please try again.');
           if (streamRef.current) {
             streamRef.current.getTracks().forEach((track) => track.stop());
+            streamRef.current = null;
           }
+          audioChunksRef.current = [];
           return;
         }
         
         const audioUrl = URL.createObjectURL(audioBlob);
         sendVoiceNote(audioUrl, audioBlob);
         
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach((track) => track.stop());
-          streamRef.current = null;
-        }
+        // Clean up stream after a delay to ensure blob URL is created
+        setTimeout(() => {
+          if (streamRef.current) {
+            streamRef.current.getTracks().forEach((track) => track.stop());
+            streamRef.current = null;
+          }
+        }, 500);
       };
 
       // Start recording with timeslice to ensure data collection
-      mediaRecorder.start(100); // Collect data every 100ms
-      setIsRecording(true);
-      setRecordingTime(0);
+      // Use a smaller timeslice for more frequent data collection
+      if (mediaRecorder.state === 'inactive') {
+        mediaRecorder.start(250); // Collect data every 250ms
+        console.log('Recording started with MIME type:', mimeType || 'default');
+        setIsRecording(true);
+        setRecordingTime(0);
 
-      timerRef.current = setInterval(() => {
-        setRecordingTime((prev) => prev + 1);
-      }, 1000);
+        timerRef.current = setInterval(() => {
+          setRecordingTime((prev) => prev + 1);
+        }, 1000);
+      }
     } catch (error) {
       console.error('Error accessing microphone:', error);
       alert('Microphone access denied. Please enable microphone permissions.');
@@ -338,13 +378,41 @@ export default function Chats() {
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
-      if (mediaRecorderRef.current.state === 'recording') {
-        mediaRecorderRef.current.stop();
+      const recorder = mediaRecorderRef.current;
+      console.log('Stopping recording. State:', recorder.state, 'Recording time:', recordingTime);
+      
+      // Don't allow stopping if recording time is less than 0.5 seconds (likely accidental)
+      if (recordingTime < 0.5) {
+        console.log('Recording too short, cancelling');
+        setIsRecording(false);
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+        if (recorder.state === 'recording' || recorder.state === 'paused') {
+          recorder.stop();
+        }
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop());
+          streamRef.current = null;
+        }
+        audioChunksRef.current = [];
+        return;
       }
-      setIsRecording(false);
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
+      
+      if (recorder.state === 'recording' || recorder.state === 'paused') {
+        // Request final data before stopping
+        recorder.requestData();
+        // Wait a moment to ensure data is collected
+        setTimeout(() => {
+          recorder.stop();
+        }, 100);
+      } else {
+        setIsRecording(false);
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
       }
     }
   };
@@ -362,7 +430,9 @@ export default function Chats() {
       timestamp: new Date().toISOString(),
       sender: 'me',
       optimistic: true,
-      replyTo: replyingTo?.id || null
+      replyTo: replyingTo?.id || null,
+      isDelivered: false,
+      isRead: false
     };
     
     setChatMessages(prev => [...prev, optimisticMessage]);
@@ -412,7 +482,9 @@ export default function Chats() {
       sender: 'me',
       optimistic: true,
       replyTo: replyToId,
-      replyToMessage: replyingTo || null
+      replyToMessage: replyingTo || null,
+      isDelivered: false,
+      isRead: false
     };
     
     setChatMessages(prev => [...prev, optimisticMessage]);
@@ -466,7 +538,9 @@ export default function Chats() {
       timestamp: new Date().toISOString(),
       sender: 'me',
       optimistic: true,
-      replyTo: replyingTo?.id || null
+      replyTo: replyingTo?.id || null,
+      isDelivered: false,
+      isRead: false
     };
     
     setChatMessages(prev => [...prev, optimisticMessage]);
@@ -516,7 +590,9 @@ export default function Chats() {
       timestamp: new Date().toISOString(),
       sender: 'me',
       optimistic: true,
-      replyTo: replyingTo?.id || null
+      replyTo: replyingTo?.id || null,
+      isDelivered: false,
+      isRead: false
     };
     
     setChatMessages(prev => [...prev, optimisticMessage]);
@@ -551,11 +627,12 @@ export default function Chats() {
   };
 
   // Swipe handlers for mobile
-  const handleTouchStart = (e, messageId) => {
+  const handleTouchStart = (e, messageId, sender) => {
     setSwipeData({
       [messageId]: {
         startX: e.touches[0].clientX,
-        offset: 0
+        offset: 0,
+        sender: sender
       }
     });
   };
@@ -567,14 +644,28 @@ export default function Chats() {
     const currentX = e.touches[0].clientX;
     const diff = swipe.startX - currentX;
     
-    // Only allow swiping left (to reveal reply)
-    if (diff > 0) {
-      setSwipeData({
-        [messageId]: {
-          ...swipe,
-          offset: Math.min(diff, 80)
-        }
-      });
+    // For received messages (other), swipe left to right (positive diff = swipe right)
+    // For sent messages (me), swipe right to left (negative diff = swipe left)
+    if (swipe.sender === 'other') {
+      // Swipe from left to right (positive offset)
+      if (diff < 0) {
+        setSwipeData({
+          [messageId]: {
+            ...swipe,
+            offset: Math.min(Math.abs(diff), 80)
+          }
+        });
+      }
+    } else {
+      // Swipe from right to left (negative offset, current behavior)
+      if (diff > 0) {
+        setSwipeData({
+          [messageId]: {
+            ...swipe,
+            offset: Math.min(diff, 80)
+          }
+        });
+      }
     }
   };
 
@@ -635,30 +726,40 @@ export default function Chats() {
               <div
                 key={msg.id}
                 className={`message ${msg.sender === 'me' ? 'sent' : 'received'} ${isOptimistic ? 'optimistic' : ''}`}
-                onTouchStart={(e) => handleTouchStart(e, msg.id)}
+                onTouchStart={(e) => handleTouchStart(e, msg.id, msg.sender)}
                 onTouchMove={(e) => handleTouchMove(e, msg.id)}
                 onTouchEnd={(e) => handleTouchEnd(e, msg.id)}
                 onMouseEnter={() => setHoveredMessageId(msg.id)}
                 onMouseLeave={() => setHoveredMessageId(null)}
                 style={{
-                  transform: swipeData[msg.id]?.offset > 0 ? `translateX(-${swipeData[msg.id].offset}px)` : 'translateX(0)',
+                  transform: swipeData[msg.id]?.offset > 0 
+                    ? (msg.sender === 'other' 
+                        ? `translateX(${swipeData[msg.id].offset}px)` 
+                        : `translateX(-${swipeData[msg.id].offset}px)`)
+                    : 'translateX(0)',
                   transition: !swipeData[msg.id] ? 'transform 0.2s ease-out' : 'none'
                 }}
               >
-                {hoveredMessageId === msg.id && (
-                  <div className="message-menu">
-                    <button
-                      type="button"
-                      className="message-menu-btn"
-                      onClick={() => handleReply(msg)}
-                      aria-label="Reply"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M8 0L3 5h3v3h4V5h3L8 0zM0 9v7h16V9h-2v5H2V9H0z" fill="currentColor"/>
-                      </svg>
-                    </button>
-                  </div>
-                )}
+                <div 
+                  className="message-menu-wrapper"
+                  onMouseEnter={() => setHoveredMessageId(msg.id)}
+                  onMouseLeave={() => setHoveredMessageId(null)}
+                >
+                  {hoveredMessageId === msg.id && (
+                    <div className="message-menu">
+                      <button
+                        type="button"
+                        className="message-menu-btn"
+                        onClick={() => handleReply(msg)}
+                        aria-label="Reply"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                          <path d="M8 0L3 5h3v3h4V5h3L8 0zM0 9v7h16V9h-2v5H2V9H0z" fill="currentColor"/>
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                </div>
                 {replyToMessage && (
                   <div className="message-reply-preview">
                     <div className="reply-preview-line" />
@@ -693,9 +794,35 @@ export default function Chats() {
                     </video>
                   </div>
                 )}
-                <span className="message-time">
-                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
+                <div className="message-time-container">
+                  <span className="message-time">
+                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  {msg.sender === 'me' && (
+                    <span className="message-status">
+                      {msg.optimistic ? (
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="status-icon status-clock">
+                          <path d="M6 1C3.24 1 1 3.24 1 6C1 8.76 3.24 11 6 11C8.76 11 11 8.76 11 6C11 3.24 8.76 1 6 1ZM6 10C3.79 10 2 8.21 2 6C2 3.79 3.79 2 6 2C8.21 2 10 3.79 10 6C10 8.21 8.21 10 6 10Z" fill="currentColor"/>
+                          <path d="M6.5 3.5V6.5L8.5 8.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+                        </svg>
+                      ) : msg.isRead ? (
+                        <svg width="16" height="11" viewBox="0 0 16 11" fill="none" className="status-icon status-read">
+                          <path d="M0 5.5L3.5 9L9.5 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M6.5 5.5L10 9L16 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      ) : msg.isDelivered ? (
+                        <svg width="16" height="11" viewBox="0 0 16 11" fill="none" className="status-icon status-delivered">
+                          <path d="M0 5.5L3.5 9L9.5 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M6.5 5.5L10 9L16 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      ) : (
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="status-icon status-sent">
+                          <path d="M1 6L5 10L11 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
+                    </span>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -761,10 +888,28 @@ export default function Chats() {
             <button
               type="button"
               className={`voice-btn ${isRecording ? 'recording' : ''}`}
-              onMouseDown={startRecording}
-              onMouseUp={stopRecording}
-              onTouchStart={startRecording}
-              onTouchEnd={stopRecording}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                startRecording();
+              }}
+              onMouseUp={(e) => {
+                e.preventDefault();
+                stopRecording();
+              }}
+              onMouseLeave={(e) => {
+                if (isRecording) {
+                  e.preventDefault();
+                  stopRecording();
+                }
+              }}
+              onTouchStart={(e) => {
+                e.preventDefault();
+                startRecording();
+              }}
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                stopRecording();
+              }}
             >
               {isRecording ? `${recordingTime}s` : '🎤'}
             </button>

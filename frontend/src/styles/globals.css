@@ -1346,6 +1346,8 @@ button {
   padding: 1rem;
   max-width: 600px;
   margin: 0 auto;
+  position: relative;
+  z-index: 0;
 }
 
 .chats-list {
@@ -1416,6 +1418,9 @@ button {
   max-width: 600px;
   margin: 0 auto;
   background: var(--bg);
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
 }
 
 .chat-header {
@@ -1493,10 +1498,61 @@ button {
   border-radius: 18px 18px 18px 4px;
 }
 
+.message-time-container {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0 0.5rem;
+}
+
 .message-time {
   font-size: 0.75rem;
   color: var(--text-light);
-  padding: 0 0.5rem;
+}
+
+.message-status {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.125rem;
+}
+
+.status-icon {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.message.sent .status-icon {
+  color: var(--text-light);
+}
+
+.message.sent .status-icon.status-read {
+  color: #4FC3F7; /* Blue color for read status, similar to WhatsApp */
+  opacity: 1;
+}
+
+.message.sent .status-icon.status-delivered {
+  color: var(--text-light);
+  opacity: 0.8;
+}
+
+.message.sent .status-icon.status-sent {
+  color: var(--text-light);
+  opacity: 0.6;
+}
+
+.message.sent .status-icon.status-clock {
+  color: var(--text-light);
+  opacity: 0.5;
+  animation: pulse-clock 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-clock {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.8;
+  }
 }
 
 /* Message Reply Preview */
@@ -1561,25 +1617,26 @@ button {
 }
 
 /* Message Menu (Three-dot menu for desktop) */
-.message-menu {
+.message-menu-wrapper {
   position: absolute;
   right: -40px;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 0;
+  bottom: 0;
+  width: 40px;
   display: flex;
   align-items: center;
+  pointer-events: none;
 }
 
-.message.sent .message-menu {
+.message.sent .message-menu-wrapper {
   left: -40px;
   right: auto;
 }
 
-/* Hide message menu on touch devices (mobile) */
-@media (hover: none) and (pointer: coarse) {
-  .message-menu {
-    display: none;
-  }
+.message-menu {
+  display: flex;
+  align-items: center;
+  pointer-events: auto;
 }
 
 .message-menu-btn {
@@ -1601,6 +1658,13 @@ button {
   background: var(--primary);
   color: #12151C;
   transform: scale(1.1);
+}
+
+/* Hide message menu on touch devices (mobile) */
+@media (hover: none) and (pointer: coarse) {
+  .message-menu-wrapper {
+    display: none;
+  }
 }
 
 /* Reply Indicator */

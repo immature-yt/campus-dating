@@ -8,6 +8,8 @@ const MessageSchema = new mongoose.Schema(
     messageType: { type: String, enum: ['text', 'voice', 'image', 'video'], default: 'text' },
     mediaUrl: { type: String },
     replyTo: { type: mongoose.Schema.Types.ObjectId, ref: 'Message', default: null },
+    isDelivered: { type: Boolean, default: false },
+    deliveredAt: { type: Date },
     isRead: { type: Boolean, default: false },
     readAt: { type: Date }
   },

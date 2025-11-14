@@ -99,6 +99,14 @@ router.get('/:userId', requireAuth, async (req, res) => {
     })
       .populate('fromUser', 'name email photos')
       .populate('toUser', 'name email photos')
+      .populate({
+        path: 'replyTo',
+        select: 'content messageType mediaUrl fromUser',
+        populate: {
+          path: 'fromUser',
+          select: 'name'
+        }
+      })
       .sort({ createdAt: 1 })
       .limit(500);
 
@@ -118,7 +126,7 @@ router.get('/:userId', requireAuth, async (req, res) => {
 // Send a message
 router.post('/send', requireAuth, async (req, res) => {
   try {
-    const { toUserId, content, messageType = 'text', mediaUrl } = req.body;
+    const { toUserId, content, messageType = 'text', mediaUrl, replyTo } = req.body;
 
     if (!toUserId || !content) {
       return res.status(400).json({ error: 'toUserId and content are required' });
@@ -145,20 +153,53 @@ router.post('/send', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'No match found with this user' });
     }
 
+    // Validate replyTo if provided
+    let replyToObjectId = null;
+    if (replyTo) {
+      try {
+        replyToObjectId = new mongoose.Types.ObjectId(replyTo);
+        // Verify the replyTo message exists and is in the same conversation
+        const replyToMessage = await Message.findOne({
+          _id: replyToObjectId,
+          $or: [
+            { fromUser: req.user._id, toUser: toUserObjectId },
+            { fromUser: toUserObjectId, toUser: req.user._id }
+          ]
+        });
+        
+        if (!replyToMessage) {
+          return res.status(400).json({ error: 'Invalid replyTo message' });
+        }
+      } catch (error) {
+        return res.status(400).json({ error: 'Invalid replyTo format' });
+      }
+    }
+
     // Create message
     const message = await Message.create({
       fromUser: req.user._id,
       toUser: toUserObjectId,
       content,
       messageType,
-      mediaUrl: mediaUrl || null
+      mediaUrl: mediaUrl || null,
+      replyTo: replyToObjectId
     });
 
-    // Populate user info before returning
+    // Populate user info and replyTo before returning
     await message.populate('fromUser', 'name email photos');
     await message.populate('toUser', 'name email photos');
+    if (replyToObjectId) {
+      await message.populate({
+        path: 'replyTo',
+        select: 'content messageType mediaUrl fromUser',
+        populate: {
+          path: 'fromUser',
+          select: 'name'
+        }
+      });
+    }
 
-    console.log(`Message sent: fromUser=${req.user._id}, toUser=${toUserObjectId}`);
+    console.log(`Message sent: fromUser=${req.user._id}, toUser=${toUserObjectId}, replyTo=${replyToObjectId}`);
 
     return res.json({ message });
   } catch (error) {

@@ -132,8 +132,12 @@ export default function Chats() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [showMediaOptions, setShowMediaOptions] = useState(false);
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [swipeData, setSwipeData] = useState({});
+  const [hoveredMessageId, setHoveredMessageId] = useState(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
+  const streamRef = useRef(null);
   const timerRef = useRef(null);
   const messagesEndRef = useRef(null);
   const imageInputRef = useRef(null);
@@ -189,7 +193,7 @@ export default function Chats() {
     }
   };
 
-  const loadChatMessages = async (userId) => {
+  const loadChatMessages = async (userId, preserveOptimistic = false) => {
     try {
       if (!userId || !me) return;
       
@@ -201,6 +205,28 @@ export default function Chats() {
         const myIdStr = me._id?.toString();
         const isFromMe = fromUserIdStr === myIdStr;
         
+        // Format replyTo message if it exists
+        let replyToMessage = null;
+        if (msg.replyTo) {
+          const replyToMsg = typeof msg.replyTo === 'object' ? msg.replyTo : null;
+          if (replyToMsg) {
+            const replyFromUserId = typeof replyToMsg.fromUser === 'object' ? replyToMsg.fromUser._id : replyToMsg.fromUser;
+            const replyFromUserIdStr = replyFromUserId?.toString();
+            const myIdStr = me._id?.toString();
+            const isReplyFromMe = replyFromUserIdStr === myIdStr;
+            
+            replyToMessage = {
+              id: replyToMsg._id,
+              type: replyToMsg.messageType || 'text',
+              text: replyToMsg.content,
+              audioUrl: replyToMsg.messageType === 'voice' ? replyToMsg.mediaUrl : null,
+              imageUrl: replyToMsg.messageType === 'image' ? replyToMsg.mediaUrl : null,
+              videoUrl: replyToMsg.messageType === 'video' ? replyToMsg.mediaUrl : null,
+              sender: isReplyFromMe ? 'me' : 'other'
+            };
+          }
+        }
+        
         return {
           id: msg._id,
           type: msg.messageType || 'text',
@@ -209,10 +235,23 @@ export default function Chats() {
           imageUrl: msg.messageType === 'image' ? msg.mediaUrl : null,
           videoUrl: msg.messageType === 'video' ? msg.mediaUrl : null,
           timestamp: msg.createdAt,
-          sender: isFromMe ? 'me' : 'other'
+          sender: isFromMe ? 'me' : 'other',
+          replyTo: msg.replyTo ? (typeof msg.replyTo === 'object' ? msg.replyTo._id : msg.replyTo) : null,
+          replyToMessage: replyToMessage
         };
       });
-      setChatMessages(formattedMessages);
+      
+      if (preserveOptimistic) {
+        // Keep optimistic messages that haven't been confirmed yet
+        setChatMessages(prev => {
+          const optimistic = prev.filter(m => m.optimistic);
+          return [...formattedMessages, ...optimistic].sort((a, b) => 
+            new Date(a.timestamp || 0) - new Date(b.timestamp || 0)
+          );
+        });
+      } else {
+        setChatMessages(formattedMessages);
+      }
     } catch (error) {
       console.error('Error loading messages:', error);
       // Don't set empty array on error, keep existing messages
@@ -226,24 +265,64 @@ export default function Chats() {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      streamRef.current = stream;
+      
+      // Get supported MIME type
+      let mimeType = 'audio/webm';
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'audio/mp4';
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+          mimeType = ''; // Use default
+        }
+      }
+      
+      const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
       mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
+        if (event.data && event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
       };
 
-      mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const audioUrl = URL.createObjectURL(audioBlob);
-        sendVoiceNote(audioUrl, audioBlob);
-        stream.getTracks().forEach((track) => track.stop());
+      mediaRecorder.onerror = (event) => {
+        console.error('MediaRecorder error:', event.error);
+        alert('Recording error occurred. Please try again.');
+        stopRecording();
       };
 
-      mediaRecorder.start();
+      mediaRecorder.onstop = () => {
+        if (audioChunksRef.current.length === 0) {
+          console.error('No audio data recorded');
+          alert('No audio was recorded. Please try again.');
+          if (streamRef.current) {
+            streamRef.current.getTracks().forEach((track) => track.stop());
+          }
+          return;
+        }
+        
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType || 'audio/webm' });
+        if (audioBlob.size === 0) {
+          console.error('Empty audio blob');
+          alert('Recording was empty. Please try again.');
+          if (streamRef.current) {
+            streamRef.current.getTracks().forEach((track) => track.stop());
+          }
+          return;
+        }
+        
+        const audioUrl = URL.createObjectURL(audioBlob);
+        sendVoiceNote(audioUrl, audioBlob);
+        
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop());
+          streamRef.current = null;
+        }
+      };
+
+      // Start recording with timeslice to ensure data collection
+      mediaRecorder.start(100); // Collect data every 100ms
       setIsRecording(true);
       setRecordingTime(0);
 
@@ -253,15 +332,19 @@ export default function Chats() {
     } catch (error) {
       console.error('Error accessing microphone:', error);
       alert('Microphone access denied. Please enable microphone permissions.');
+      setIsRecording(false);
     }
   };
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
+      if (mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
       setIsRecording(false);
       if (timerRef.current) {
         clearInterval(timerRef.current);
+        timerRef.current = null;
       }
     }
   };
@@ -269,20 +352,44 @@ export default function Chats() {
   const sendVoiceNote = async (audioUrl, audioBlob) => {
     if (!chatId) return;
     
+    // Create optimistic message
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMessage = {
+      id: tempId,
+      type: 'voice',
+      audioUrl: audioUrl,
+      text: 'Voice note',
+      timestamp: new Date().toISOString(),
+      sender: 'me',
+      optimistic: true,
+      replyTo: replyingTo?.id || null
+    };
+    
+    setChatMessages(prev => [...prev, optimisticMessage]);
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+    
     // Convert blob to base64 for now (in production, upload to Cloudinary)
     const reader = new FileReader();
     reader.onloadend = async () => {
       try {
-        await apiPost('/api/messages/send', {
+        const response = await apiPost('/api/messages/send', {
           toUserId: chatId,
           content: 'Voice note',
           messageType: 'voice',
-          mediaUrl: reader.result
+          mediaUrl: reader.result,
+          replyTo: replyingTo?.id || null
         });
-        // Reload messages
-        await loadChatMessages(chatId);
+        
+        // Remove optimistic message and reload
+        setChatMessages(prev => prev.filter(m => m.id !== tempId));
+        await loadChatMessages(chatId, true);
+        setReplyingTo(null);
       } catch (error) {
         console.error('Error sending voice note:', error);
+        // Remove optimistic message on error
+        setChatMessages(prev => prev.filter(m => m.id !== tempId));
         alert('Failed to send voice note');
       }
     };
@@ -292,23 +399,47 @@ export default function Chats() {
   const sendMessage = async () => {
     if (!inputText.trim() || !chatId) return;
     
+    const messageText = inputText.trim();
+    const replyToId = replyingTo?.id || null;
+    
+    // Create optimistic message
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMessage = {
+      id: tempId,
+      type: 'text',
+      text: messageText,
+      timestamp: new Date().toISOString(),
+      sender: 'me',
+      optimistic: true,
+      replyTo: replyToId,
+      replyToMessage: replyingTo || null
+    };
+    
+    setChatMessages(prev => [...prev, optimisticMessage]);
+    setInputText('');
+    setReplyingTo(null);
+    
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+    
     try {
       await apiPost('/api/messages/send', {
         toUserId: chatId,
-        content: inputText,
-        messageType: 'text'
+        content: messageText,
+        messageType: 'text',
+        replyTo: replyToId
       });
-      setInputText('');
-      // Reload messages immediately
-      await loadChatMessages(chatId);
+      
+      // Remove optimistic message and reload
+      setChatMessages(prev => prev.filter(m => m.id !== tempId));
+      await loadChatMessages(chatId, true);
       // Reload conversations to update preview
       await loadConversations();
-      // Scroll to bottom after sending
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
     } catch (error) {
       console.error('Error sending message:', error);
+      // Remove optimistic message on error
+      setChatMessages(prev => prev.filter(m => m.id !== tempId));
       alert('Failed to send message');
     }
   };
@@ -325,6 +456,23 @@ export default function Chats() {
       return;
     }
     
+    // Create optimistic message
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMessage = {
+      id: tempId,
+      type: 'image',
+      imageUrl: URL.createObjectURL(file),
+      text: 'Image',
+      timestamp: new Date().toISOString(),
+      sender: 'me',
+      optimistic: true,
+      replyTo: replyingTo?.id || null
+    };
+    
+    setChatMessages(prev => [...prev, optimisticMessage]);
+    setShowMediaOptions(false);
+    setReplyingTo(null);
+    
     const reader = new FileReader();
     reader.onloadend = async () => {
       try {
@@ -332,12 +480,14 @@ export default function Chats() {
           toUserId: chatId,
           content: 'Image',
           messageType: 'image',
-          mediaUrl: reader.result
+          mediaUrl: reader.result,
+          replyTo: optimisticMessage.replyTo
         });
-        await loadChatMessages(chatId);
-        setShowMediaOptions(false);
+        setChatMessages(prev => prev.filter(m => m.id !== tempId));
+        await loadChatMessages(chatId, true);
       } catch (error) {
         console.error('Error sending image:', error);
+        setChatMessages(prev => prev.filter(m => m.id !== tempId));
         alert('Failed to send image');
       }
     };
@@ -356,6 +506,23 @@ export default function Chats() {
       return;
     }
     
+    // Create optimistic message
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMessage = {
+      id: tempId,
+      type: 'video',
+      videoUrl: URL.createObjectURL(file),
+      text: 'Video',
+      timestamp: new Date().toISOString(),
+      sender: 'me',
+      optimistic: true,
+      replyTo: replyingTo?.id || null
+    };
+    
+    setChatMessages(prev => [...prev, optimisticMessage]);
+    setShowMediaOptions(false);
+    setReplyingTo(null);
+    
     const reader = new FileReader();
     reader.onloadend = async () => {
       try {
@@ -363,12 +530,14 @@ export default function Chats() {
           toUserId: chatId,
           content: 'Video',
           messageType: 'video',
-          mediaUrl: reader.result
+          mediaUrl: reader.result,
+          replyTo: optimisticMessage.replyTo
         });
-        await loadChatMessages(chatId);
-        setShowMediaOptions(false);
+        setChatMessages(prev => prev.filter(m => m.id !== tempId));
+        await loadChatMessages(chatId, true);
       } catch (error) {
         console.error('Error sending video:', error);
+        setChatMessages(prev => prev.filter(m => m.id !== tempId));
         alert('Failed to send video');
       }
     };
@@ -379,6 +548,61 @@ export default function Chats() {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Swipe handlers for mobile
+  const handleTouchStart = (e, messageId) => {
+    setSwipeData({
+      [messageId]: {
+        startX: e.touches[0].clientX,
+        offset: 0
+      }
+    });
+  };
+
+  const handleTouchMove = (e, messageId) => {
+    const swipe = swipeData[messageId];
+    if (!swipe) return;
+    
+    const currentX = e.touches[0].clientX;
+    const diff = swipe.startX - currentX;
+    
+    // Only allow swiping left (to reveal reply)
+    if (diff > 0) {
+      setSwipeData({
+        [messageId]: {
+          ...swipe,
+          offset: Math.min(diff, 80)
+        }
+      });
+    }
+  };
+
+  const handleTouchEnd = (e, messageId) => {
+    const swipe = swipeData[messageId];
+    if (!swipe) return;
+    
+    if (swipe.offset > 40) {
+      // Swipe threshold reached, set reply
+      const message = chatMessages.find(m => m.id === messageId);
+      if (message) {
+        setReplyingTo(message);
+      }
+    }
+    setSwipeData({});
+  };
+
+  const handleReply = (message) => {
+    setReplyingTo(message);
+    setShowMediaOptions(false);
+  };
+
+  const cancelReply = () => {
+    setReplyingTo(null);
+  };
+
+  const findReplyToMessage = (replyToId) => {
+    return chatMessages.find(m => m.id === replyToId);
   };
 
   if (!me) {
@@ -403,34 +627,97 @@ export default function Chats() {
           <h2>{chat?.name || 'Chat'}</h2>
         </div>
         <div className="chat-messages">
-          {chatMessages.map((msg) => (
-            <div key={msg.id} className={`message ${msg.sender === 'me' ? 'sent' : 'received'}`}>
-              {msg.type === 'voice' && (
-                <div className="voice-message">
-                  <VoiceNotePlayer audioUrl={msg.audioUrl} />
-                </div>
-              )}
-              {msg.type === 'text' && <p>{msg.text}</p>}
-              {msg.type === 'image' && (
-                <div className="image-message">
-                  <img src={msg.imageUrl} alt="Shared image" />
-                </div>
-              )}
-              {msg.type === 'video' && (
-                <div className="video-message">
-                  <video controls src={msg.videoUrl}>
-                    Your browser does not support video playback.
-                  </video>
-                </div>
-              )}
-              <span className="message-time">
-                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </span>
-            </div>
-          ))}
+          {chatMessages.map((msg) => {
+            const replyToMessage = msg.replyToMessage || (msg.replyTo ? findReplyToMessage(msg.replyTo) : null);
+            const isOptimistic = msg.optimistic;
+            
+            return (
+              <div
+                key={msg.id}
+                className={`message ${msg.sender === 'me' ? 'sent' : 'received'} ${isOptimistic ? 'optimistic' : ''}`}
+                onTouchStart={(e) => handleTouchStart(e, msg.id)}
+                onTouchMove={(e) => handleTouchMove(e, msg.id)}
+                onTouchEnd={(e) => handleTouchEnd(e, msg.id)}
+                onMouseEnter={() => setHoveredMessageId(msg.id)}
+                onMouseLeave={() => setHoveredMessageId(null)}
+                style={{
+                  transform: swipeData[msg.id]?.offset > 0 ? `translateX(-${swipeData[msg.id].offset}px)` : 'translateX(0)',
+                  transition: !swipeData[msg.id] ? 'transform 0.2s ease-out' : 'none'
+                }}
+              >
+                {hoveredMessageId === msg.id && (
+                  <div className="message-menu">
+                    <button
+                      type="button"
+                      className="message-menu-btn"
+                      onClick={() => handleReply(msg)}
+                      aria-label="Reply"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M8 0L3 5h3v3h4V5h3L8 0zM0 9v7h16V9h-2v5H2V9H0z" fill="currentColor"/>
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                {replyToMessage && (
+                  <div className="message-reply-preview">
+                    <div className="reply-preview-line" />
+                    <div className="reply-preview-content">
+                      <span className="reply-preview-sender">
+                        {replyToMessage.sender === 'me' ? 'You' : chat?.name || 'User'}
+                      </span>
+                      <span className="reply-preview-text">
+                        {replyToMessage.type === 'voice' ? '🎤 Voice note' : 
+                         replyToMessage.type === 'image' ? '🖼️ Image' :
+                         replyToMessage.type === 'video' ? '🎥 Video' :
+                         replyToMessage.text}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {msg.type === 'voice' && (
+                  <div className="voice-message">
+                    <VoiceNotePlayer audioUrl={msg.audioUrl} />
+                  </div>
+                )}
+                {msg.type === 'text' && <p>{msg.text}</p>}
+                {msg.type === 'image' && (
+                  <div className="image-message">
+                    <img src={msg.imageUrl} alt="Shared image" />
+                  </div>
+                )}
+                {msg.type === 'video' && (
+                  <div className="video-message">
+                    <video controls src={msg.videoUrl}>
+                      Your browser does not support video playback.
+                    </video>
+                  </div>
+                )}
+                <span className="message-time">
+                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+            );
+          })}
           <div ref={messagesEndRef} />
         </div>
         <div className="chat-input">
+          {replyingTo && (
+            <div className="reply-indicator">
+              <div className="reply-indicator-content">
+                <span className="reply-indicator-label">Replying to {replyingTo.sender === 'me' ? 'yourself' : chat?.name || 'user'}</span>
+                <span className="reply-indicator-text">
+                  {replyingTo.type === 'voice' ? '🎤 Voice note' : 
+                   replyingTo.type === 'image' ? '🖼️ Image' :
+                   replyingTo.type === 'video' ? '🎥 Video' :
+                   replyingTo.text}
+                </span>
+              </div>
+              <button type="button" className="reply-cancel-btn" onClick={cancelReply} aria-label="Cancel reply">
+                ×
+              </button>
+            </div>
+          )}
           {isRecording && (
             <div className="recording-indicator">
               <span className="recording-dot" /> Recording: {formatTime(recordingTime)}

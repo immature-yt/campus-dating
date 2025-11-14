@@ -143,12 +143,7 @@ router.get('/find', requireAuth, async (req, res) => {
   const { 
     college, 
     secondaryCollege, 
-    exclude, 
-    gender, 
-    minAge, 
-    maxAge, 
-    department,
-    verifiedOnly 
+    exclude
   } = req.query;
 
   // Check if the requesting user is approved
@@ -168,6 +163,23 @@ router.get('/find', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'college query parameter is required' });
   }
 
+  if (!requestingUser.gender) {
+    return res.status(400).json({ error: 'Please set your gender in your profile to start matching' });
+  }
+
+  // Determine opposite gender automatically
+  // Male sees Female, Female sees Male
+  // Non-binary and others can see everyone (no gender filter)
+  let oppositeGender;
+  if (requestingUser.gender === 'male') {
+    oppositeGender = 'female';
+  } else if (requestingUser.gender === 'female') {
+    oppositeGender = 'male';
+  } else {
+    // Non-binary, other, prefer_not_to_say - no gender filter (see everyone)
+    oppositeGender = undefined;
+  }
+
   try {
     const excludeId = req.user?._id;
     const excludeIds = exclude ? exclude.split(',').filter(Boolean) : [];
@@ -176,14 +188,14 @@ router.get('/find', requireAuth, async (req, res) => {
       college,
       excludeId,
       excludeIds,
-      gender,
-      minAge,
-      maxAge,
-      department,
-      verifiedOnly
+      gender: oppositeGender, // Automatically filter by opposite gender
+      minAge: undefined, // No age filter for college students (18-22)
+      maxAge: undefined,
+      department: undefined,
+      verifiedOnly: undefined
     };
     
-    console.log(`Finding match for user ${req.user._id} (approved: ${requestingUser.verification_status}) with college: ${college}`);
+    console.log(`Finding match for user ${req.user._id} (gender: ${requestingUser.gender}) looking for: ${oppositeGender || 'all'} in college: ${college}`);
     
     const primaryMatch = await sampleApprovedUser(filters);
 
@@ -205,40 +217,22 @@ router.get('/find', requireAuth, async (req, res) => {
       }
     }
 
-    // If no matches found, try without college restriction (if there are other approved users)
+    // If no matches found, try without college restriction (but still opposite gender)
     console.log('No matches found with college filter, trying broader search without college restriction...');
     const broadMatch = await sampleApprovedUser({
       excludeId,
       excludeIds,
-      gender: gender || undefined,
-      minAge: minAge || undefined,
-      maxAge: maxAge || undefined,
-      department: department || undefined,
-      verifiedOnly: verifiedOnly || undefined,
+      gender: oppositeGender, // Still filter by opposite gender
+      minAge: undefined,
+      maxAge: undefined,
+      department: undefined,
+      verifiedOnly: undefined,
       college: undefined // Remove college restriction
     });
 
     if (broadMatch) {
       console.log(`Found match without college filter: ${broadMatch._id} from ${broadMatch.college}`);
       return res.json({ match: formatMatch(broadMatch), fallback: true });
-    }
-
-    // Last resort: try with minimal filters (only approved and not blocked)
-    console.log('Trying minimal filter search (only approved, not blocked)...');
-    const minimalMatch = await sampleApprovedUser({
-      excludeId,
-      excludeIds,
-      gender: undefined,
-      minAge: undefined,
-      maxAge: undefined,
-      department: undefined,
-      verifiedOnly: undefined,
-      college: undefined
-    });
-
-    if (minimalMatch) {
-      console.log(`Found match with minimal filters: ${minimalMatch._id} from ${minimalMatch.college}`);
-      return res.json({ match: formatMatch(minimalMatch), fallback: true });
     }
 
     // Check total approved users count for debugging

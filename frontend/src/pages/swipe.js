@@ -56,21 +56,6 @@ export default function Swipe() {
   const [isFindingMatch, setIsFindingMatch] = useState(false);
   const [matchError, setMatchError] = useState('');
   const [history, setHistory] = useState([]);
-  const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState({
-    interestedIn: '',
-    minAge: 18,
-    maxAge: 35,
-    department: '',
-    showVerifiedOnly: false
-  });
-  const [appliedFilters, setAppliedFilters] = useState({
-    interestedIn: '',
-    minAge: 18,
-    maxAge: 35,
-    department: '',
-    showVerifiedOnly: false
-  });
 
   useEffect(() => {
     apiGet('/api/auth/me')
@@ -88,37 +73,20 @@ export default function Swipe() {
     setHistory(safeParse(HISTORY_STORAGE_KEY, []));
   }, []);
 
-  const applyFilters = () => {
-    setAppliedFilters({...filters});
-    setShowFilters(false);
-    setMatch(null);
-    fetchMatch(true);
-  };
-
-  const clearFilters = () => {
-    const defaultFilters = {
-      interestedIn: '',
-      minAge: 18,
-      maxAge: 35,
-      department: '',
-      showVerifiedOnly: false
-    };
-    setFilters(defaultFilters);
-    setAppliedFilters(defaultFilters);
-    setMatch(null);
-    fetchMatch(false);
-  };
-
   const persistHistoryList = (entries) => {
     const trimmed = entries.slice(0, HISTORY_LIMIT);
     setHistory(trimmed);
     persistList(HISTORY_STORAGE_KEY, trimmed);
   };
 
-  const fetchMatch = async (useFilters = false) => {
+  const fetchMatch = async () => {
     if (isFindingMatch) return;
     if (!me?.college) {
       setMatchError('Please complete your profile to start matching.');
+      return;
+    }
+    if (!me?.gender) {
+      setMatchError('Please set your gender in your profile to start matching.');
       return;
     }
 
@@ -144,28 +112,8 @@ export default function Swipe() {
         params.append('exclude', excludeUsers.join(','));
       }
       
+      console.log('Fetching match - User gender:', me.gender);
       console.log('Excluding users:', excludeUsers);
-      console.log('User college:', me.college);
-      
-      // Only send non-default filters to backend
-      if (appliedFilters.interestedIn) {
-        params.append('gender', appliedFilters.interestedIn);
-      }
-      if (appliedFilters.minAge && appliedFilters.minAge !== 18) {
-        params.append('minAge', appliedFilters.minAge.toString());
-      }
-      if (appliedFilters.maxAge && appliedFilters.maxAge !== 35) {
-        params.append('maxAge', appliedFilters.maxAge.toString());
-      }
-      if (appliedFilters.department && appliedFilters.department.trim() !== '') {
-        params.append('department', appliedFilters.department);
-      }
-      if (appliedFilters.showVerifiedOnly) {
-        params.append('verifiedOnly', 'true');
-      }
-      
-      console.log('Request params:', params.toString());
-      console.log('Exclude count:', excludeUsers.length);
       
       const response = await apiGet(`/api/match/find?${params.toString()}`);
       if (response.match) {
@@ -176,10 +124,7 @@ export default function Swipe() {
         if (isOwnProfile || excludeUsers.includes(matchId)) {
           setMatchError('No new matches found. Try again later!');
         } else {
-          console.log('Match data:', response.match);
-          console.log('Photos:', response.match.photos);
-          console.log('Images:', response.match.images);
-          console.log('Prompts:', response.match.prompts);
+          console.log('Match found:', response.match.name);
           setMatch(response.match);
         }
       } else {
@@ -193,12 +138,10 @@ export default function Swipe() {
       let errorMsg = 'Unable to find matches. Please try again.';
       
       try {
-        // The error message might be a JSON string
         const errorText = error?.message || error?.toString() || '';
         errorData = JSON.parse(errorText);
         errorMsg = errorData.error || errorText;
       } catch (parseErr) {
-        // If not JSON, use the error message as-is
         errorMsg = error?.message || error?.toString() || 'Unable to find matches. Please try again.';
       }
       
@@ -206,36 +149,17 @@ export default function Swipe() {
       if (errorMsg.includes('approved') || errorMsg.includes('verification')) {
         setMatchError('Your account must be approved before you can see matches. Please wait for admin approval.');
       } else if (errorMsg.includes('No matches found') || errorData.error === 'No matches found') {
-        // Check if there's debug info in the error response
         if (errorData.debug) {
           const { totalApprovedUsers, excludedUsers } = errorData.debug;
-          const hasActiveFilters = appliedFilters.interestedIn || 
-                                 (appliedFilters.department && appliedFilters.department.trim() !== '') ||
-                                 appliedFilters.showVerifiedOnly ||
-                                 (appliedFilters.minAge !== 18) || 
-                                 (appliedFilters.maxAge !== 35);
-          
           if (totalApprovedUsers === 0) {
             setMatchError('No approved users found yet. Please check back later once more users join!');
           } else if (totalApprovedUsers === excludedUsers) {
             setMatchError('You\'ve seen all available matches! Check back later for new users.');
           } else {
-            const filterMessage = hasActiveFilters 
-              ? 'No matches found with current filters. Try adjusting your filters or check back later!'
-              : 'No matches found at this time. Check back later for new users!';
-            setMatchError(`${filterMessage} (${totalApprovedUsers} approved users available)`);
+            setMatchError(`No matches found at this time. Check back later for new users! (${totalApprovedUsers} approved users available)`);
           }
         } else {
-          // Determine if filters are active
-          const hasActiveFilters = appliedFilters.interestedIn || 
-                                 (appliedFilters.department && appliedFilters.department.trim() !== '') ||
-                                 appliedFilters.showVerifiedOnly ||
-                                 (appliedFilters.minAge !== 18) || 
-                                 (appliedFilters.maxAge !== 35);
-          const filterMessage = hasActiveFilters 
-            ? 'No matches found with current filters. Try adjusting your filters or check back later!'
-            : 'No matches found at this time. Check back later for new users!';
-          setMatchError(filterMessage);
+          setMatchError('No matches found at this time. Check back later for new users!');
         }
       } else {
         setMatchError(errorMsg);
@@ -299,10 +223,8 @@ export default function Swipe() {
     }
 
     setMatch(null);
-    // Use current filters when fetching next match
-    const hasActiveFilters = appliedFilters.interestedIn || appliedFilters.department || appliedFilters.showVerifiedOnly || 
-                             (appliedFilters.minAge !== 18) || (appliedFilters.maxAge !== 35);
-    await fetchMatch(hasActiveFilters);
+    // Fetch next match (opposite gender filtering is automatic)
+    await fetchMatch();
   };
 
   if (!me) {
@@ -322,83 +244,11 @@ export default function Swipe() {
         <div className="swipe-header">
           <h1>Discover</h1>
           <div className="header-actions">
-            <button type="button" className="filter-toggle" onClick={() => setShowFilters(!showFilters)}>
-              🔍 Filters
-            </button>
             <button type="button" className="refresh-btn" onClick={fetchMatch} disabled={isFindingMatch}>
               {isFindingMatch ? 'Searching...' : match ? 'Next' : 'Find Match'}
             </button>
           </div>
         </div>
-
-        {showFilters && (
-          <div className="filters-panel">
-            <h3>Filter Preferences</h3>
-            <div className="filter-row">
-              <label>
-                <span>Show me</span>
-                <select
-                  value={filters.interestedIn}
-                  onChange={(e) => setFilters({ ...filters, interestedIn: e.target.value })}
-                >
-                  <option value="">Everyone</option>
-                  <option value="female">Women</option>
-                  <option value="male">Men</option>
-                  <option value="non_binary">Non-binary</option>
-                </select>
-              </label>
-              <label>
-                <span>Age Range</span>
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <input
-                    type="number"
-                    min="18"
-                    max="99"
-                    value={filters.minAge}
-                    onChange={(e) => setFilters({ ...filters, minAge: Number(e.target.value) })}
-                    style={{ width: '60px' }}
-                  />
-                  <span>to</span>
-                  <input
-                    type="number"
-                    min="18"
-                    max="99"
-                    value={filters.maxAge}
-                    onChange={(e) => setFilters({ ...filters, maxAge: Number(e.target.value) })}
-                    style={{ width: '60px' }}
-                  />
-                </div>
-              </label>
-              <label>
-                <span>Department</span>
-                <input
-                  type="text"
-                  placeholder="e.g., Computer Science"
-                  value={filters.department}
-                  onChange={(e) => setFilters({ ...filters, department: e.target.value })}
-                />
-              </label>
-            </div>
-            <div className="filter-checkbox">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={filters.showVerifiedOnly}
-                  onChange={(e) => setFilters({ ...filters, showVerifiedOnly: e.target.checked })}
-                />
-                <span>Show verified profiles only</span>
-              </label>
-            </div>
-            <div className="filter-actions">
-              <button type="button" className="clear-filters-btn" onClick={clearFilters}>
-                Clear All
-              </button>
-              <button type="button" className="apply-filters-btn" onClick={applyFilters}>
-                Apply Filters
-              </button>
-            </div>
-          </div>
-        )}
 
         {matchError && (
           <div className="error-message" role="alert">

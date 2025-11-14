@@ -111,11 +111,20 @@ export default function Likes() {
             <div className="likes-grid">
               {likesReceived.map((like) => {
                 const user = like.fromUser;
+                // Handle different photo formats
+                let photoUrl = null;
+                if (user.photos && user.photos.length > 0) {
+                  const firstPhoto = user.photos[0];
+                  photoUrl = typeof firstPhoto === 'string' 
+                    ? firstPhoto 
+                    : firstPhoto.url || firstPhoto;
+                }
+                
                 return (
                   <div key={like._id} className="like-card">
                     <div className="like-photo">
-                      {user.photos && user.photos.length > 0 ? (
-                        <img src={user.photos[0].url || user.photos[0]} alt={user.name} />
+                      {photoUrl ? (
+                        <img src={photoUrl} alt={user.name} />
                       ) : (
                         <div className="photo-fallback">
                           <span className="fallback-icon">👤</span>
@@ -124,12 +133,12 @@ export default function Likes() {
                     </div>
                     <div className="like-info">
                       <h3>
-                        {user.name}, {user.age}
+                        {user.name || 'User'}{user.age ? `, ${user.age}` : ''}
                         {user.verification_status === 'approved' && (
                           <span className="verified-badge" title="Verified">✓</span>
                         )}
                       </h3>
-                      <p>{[user.department, user.college].filter(Boolean).join(' • ')}</p>
+                      <p>{[user.department, user.college].filter(Boolean).join(' • ') || 'Campus Student'}</p>
                     </div>
                     <div className="like-actions-row">
                       <button
@@ -166,11 +175,20 @@ export default function Likes() {
             <div className="likes-grid">
               {getPendingLikes().map((like) => {
                 const user = like.toUser;
+                // Handle different photo formats
+                let photoUrl = null;
+                if (user.photos && user.photos.length > 0) {
+                  const firstPhoto = user.photos[0];
+                  photoUrl = typeof firstPhoto === 'string' 
+                    ? firstPhoto 
+                    : firstPhoto.url || firstPhoto;
+                }
+                
                 return (
                   <div key={like._id} className="like-card">
                     <div className="like-photo">
-                      {user.photos && user.photos.length > 0 ? (
-                        <img src={user.photos[0].url || user.photos[0]} alt={user.name} />
+                      {photoUrl ? (
+                        <img src={photoUrl} alt={user.name} />
                       ) : (
                         <div className="photo-fallback">
                           <span className="fallback-icon">👤</span>
@@ -179,13 +197,15 @@ export default function Likes() {
                     </div>
                     <div className="like-info">
                       <h3>
-                        {user.name}, {user.age}
+                        {user.name || 'User'}{user.age ? `, ${user.age}` : ''}
                         {user.verification_status === 'approved' && (
                           <span className="verified-badge" title="Verified">✓</span>
                         )}
                       </h3>
-                      <p>{[user.department, user.college].filter(Boolean).join(' • ')}</p>
-                      <p className="pending-text">Waiting for them to like you back...</p>
+                      <p>{[user.department, user.college].filter(Boolean).join(' • ') || 'Campus Student'}</p>
+                      <p className="pending-text" style={{ color: 'var(--text-light)', fontSize: '0.9rem', marginTop: '0.5rem' }}>
+                        Waiting for them to like you back...
+                      </p>
                     </div>
                   </div>
                 );
@@ -206,34 +226,45 @@ export default function Likes() {
             </div>
           ) : (
             <div className="likes-grid">
-              {matches.map((user) => (
-                <div key={user._id} className="match-card">
-                  <div className="like-photo">
-                    {user.photos && user.photos.length > 0 ? (
-                      <img src={user.photos[0].url || user.photos[0]} alt={user.name} />
-                    ) : (
-                      <div className="photo-fallback">
-                        <span className="fallback-icon">👤</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="like-info">
-                    <h3>
-                      {user.name}, {user.age}
-                      {user.verification_status === 'approved' && (
-                        <span className="verified-badge" title="Verified">✓</span>
+              {matches.map((user) => {
+                // Handle different photo formats
+                let photoUrl = null;
+                if (user.photos && user.photos.length > 0) {
+                  const firstPhoto = user.photos[0];
+                  photoUrl = typeof firstPhoto === 'string' 
+                    ? firstPhoto 
+                    : firstPhoto.url || firstPhoto;
+                }
+                
+                return (
+                  <div key={user._id} className="match-card">
+                    <div className="like-photo">
+                      {photoUrl ? (
+                        <img src={photoUrl} alt={user.name} />
+                      ) : (
+                        <div className="photo-fallback">
+                          <span className="fallback-icon">👤</span>
+                        </div>
                       )}
-                    </h3>
-                    <p>{[user.department, user.college].filter(Boolean).join(' • ')}</p>
+                    </div>
+                    <div className="like-info">
+                      <h3>
+                        {user.name || 'User'}{user.age ? `, ${user.age}` : ''}
+                        {user.verification_status === 'approved' && (
+                          <span className="verified-badge" title="Verified">✓</span>
+                        )}
+                      </h3>
+                      <p>{[user.department, user.college].filter(Boolean).join(' • ') || 'Campus Student'}</p>
+                    </div>
+                    <button
+                      className="message-btn"
+                      onClick={() => router.push(`/chats?id=${user._id}`)}
+                    >
+                      💬 Message
+                    </button>
                   </div>
-                  <button
-                    className="message-btn"
-                    onClick={() => router.push(`/chats?id=${user._id}`)}
-                  >
-                    💬 Message
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

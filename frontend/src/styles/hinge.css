@@ -169,51 +169,199 @@
 
 .likes-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 2rem;
+  padding: 1rem 0;
 }
 
-.match-card {
-  background: #f7f7f7;
-  border-radius: 16px;
+/* Like card styling - large photo display */
+.like-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  transition: all 0.2s;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  transition: var(--transition-base);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+}
+
+.like-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
+}
+
+/* Large profile photo section */
+.like-photo {
+  width: 100%;
+  height: 400px;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.like-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.like-photo .photo-fallback {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0;
+}
+
+.like-photo .photo-fallback .fallback-icon {
+  font-size: 5rem;
+  opacity: 0.5;
+  color: var(--text-light);
+}
+
+/* Like info section */
+.like-info {
+  padding: 1.5rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.like-info h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.like-info p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+/* Actions row */
+.like-actions-row {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0 1.5rem 1.5rem;
+  margin-top: auto;
+}
+
+.pass-btn {
+  flex: 1;
+  padding: 0.75rem 1.5rem;
+  border: 1px solid var(--border-strong);
+  background: var(--bg);
+  color: var(--text-primary);
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-base);
+}
+
+.pass-btn:hover {
+  background: var(--bg-secondary);
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.like-back-btn {
+  flex: 1;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  background: var(--primary);
+  color: #12151C;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-base);
+  box-shadow: var(--shadow-sm);
+}
+
+.like-back-btn:hover {
+  background: var(--primary-dark);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-primary);
+}
+
+/* Match card styling */
+.match-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: var(--transition-base);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
 }
 
 .match-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
 }
 
-.unlike-btn,
-.simulate-match-btn,
+/* Match card also uses like-photo for consistent styling */
+.match-card .like-photo {
+  height: 400px;
+}
+
+.match-card .like-info {
+  padding: 1.5rem;
+}
+
 .message-btn {
   width: 100%;
   padding: 0.75rem;
   border: none;
-  background: #e7e7e7;
-  color: #12151c;
+  background: var(--primary);
+  color: #12151C;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: var(--transition-base);
+  font-size: 0.95rem;
+  margin-top: auto;
+}
+
+.message-btn:hover {
+  background: var(--primary-dark);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-primary);
+}
+
+/* Additional button styles */
+.unlike-btn,
+.simulate-match-btn {
+  width: 100%;
+  padding: 0.75rem;
+  border: none;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-base);
   font-size: 0.95rem;
 }
 
 .simulate-match-btn {
-  background: #ef446c;
-  color: white;
+  background: var(--primary);
+  color: #12151C;
   margin-top: 0.5rem;
 }
 
-.message-btn {
-  background: #ef446c;
-  color: white;
-}
-
 .unlike-btn:hover,
-.simulate-match-btn:hover,
-.message-btn:hover {
+.simulate-match-btn:hover {
   opacity: 0.8;
 }
 
@@ -239,7 +387,7 @@
   display: flex;
   gap: 0.5rem;
   margin-bottom: 2rem;
-  border-bottom: 2px solid #e7e7e7;
+  border-bottom: 2px solid var(--border);
   flex-wrap: wrap;
 }
 
@@ -250,17 +398,18 @@
   border-bottom: 3px solid transparent;
   cursor: pointer;
   font-weight: 600;
-  color: #606060;
-  transition: all 0.2s;
+  color: var(--text-secondary);
+  transition: var(--transition-base);
 }
 
 .likes-tabs button.active {
-  color: #ef446c;
-  border-bottom-color: #ef446c;
+  color: var(--primary);
+  border-bottom-color: var(--primary);
 }
 
 .likes-tabs button:hover {
-  background: #f7f7f7;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 .like-actions-row {

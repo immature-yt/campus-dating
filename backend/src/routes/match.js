@@ -36,18 +36,20 @@ async function sampleApprovedUser({ college, excludeId, gender, minAge, maxAge, 
     matchStage.gender = gender;
   }
   
-  // Age filter
+  // Age filter - only apply if explicitly provided (not default values)
+  // Don't filter by age if not provided, allowing users without age to show up
   if (minAge || maxAge) {
-    matchStage.age = {};
-    if (minAge) {
-      const minAgeNum = parseInt(minAge);
-      if (!isNaN(minAgeNum) && minAgeNum > 0) {
+    const minAgeNum = minAge ? parseInt(minAge) : null;
+    const maxAgeNum = maxAge ? parseInt(maxAge) : null;
+    
+    // Only create age filter if valid numbers are provided
+    if ((minAgeNum !== null && !isNaN(minAgeNum) && minAgeNum > 0) || 
+        (maxAgeNum !== null && !isNaN(maxAgeNum) && maxAgeNum > 0)) {
+      matchStage.age = {};
+      if (minAgeNum !== null && !isNaN(minAgeNum) && minAgeNum > 0) {
         matchStage.age.$gte = minAgeNum;
       }
-    }
-    if (maxAge) {
-      const maxAgeNum = parseInt(maxAge);
-      if (!isNaN(maxAgeNum) && maxAgeNum > 0) {
+      if (maxAgeNum !== null && !isNaN(maxAgeNum) && maxAgeNum > 0) {
         matchStage.age.$lte = maxAgeNum;
       }
     }

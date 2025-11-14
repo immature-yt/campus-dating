@@ -146,31 +146,41 @@ export default function Swipe() {
       
       console.log('Excluding users:', excludeUsers);
       
-      // Always apply filters if they are set (not default values)
+      // Only apply filters if they are explicitly set (not default values)
+      // Don't apply age filters if they're at defaults (18-35)
       const hasFilters = useFilters || 
                         appliedFilters.interestedIn || 
-                        appliedFilters.department || 
+                        (appliedFilters.department && appliedFilters.department.trim() !== '') ||
                         appliedFilters.showVerifiedOnly ||
                         (appliedFilters.minAge && appliedFilters.minAge !== 18) ||
                         (appliedFilters.maxAge && appliedFilters.maxAge !== 35);
       
-      if (hasFilters) {
-        if (appliedFilters.interestedIn) {
-          params.append('gender', appliedFilters.interestedIn);
-        }
-        if (appliedFilters.minAge && appliedFilters.minAge !== 18) {
-          params.append('minAge', appliedFilters.minAge.toString());
-        }
-        if (appliedFilters.maxAge && appliedFilters.maxAge !== 35) {
-          params.append('maxAge', appliedFilters.maxAge.toString());
-        }
-        if (appliedFilters.department) {
-          params.append('department', appliedFilters.department);
-        }
-        if (appliedFilters.showVerifiedOnly) {
-          params.append('verifiedOnly', 'true');
-        }
+      // Only send non-default filters to backend
+      if (appliedFilters.interestedIn) {
+        params.append('gender', appliedFilters.interestedIn);
       }
+      if (appliedFilters.minAge && appliedFilters.minAge !== 18) {
+        params.append('minAge', appliedFilters.minAge.toString());
+      }
+      if (appliedFilters.maxAge && appliedFilters.maxAge !== 35) {
+        params.append('maxAge', appliedFilters.maxAge.toString());
+      }
+      if (appliedFilters.department && appliedFilters.department.trim() !== '') {
+        params.append('department', appliedFilters.department);
+      }
+      if (appliedFilters.showVerifiedOnly) {
+        params.append('verifiedOnly', 'true');
+      }
+      
+      console.log('Filter status:', {
+        hasFilters,
+        interestedIn: appliedFilters.interestedIn,
+        department: appliedFilters.department,
+        showVerifiedOnly: appliedFilters.showVerifiedOnly,
+        minAge: appliedFilters.minAge,
+        maxAge: appliedFilters.maxAge,
+        sendingAgeFilters: (appliedFilters.minAge && appliedFilters.minAge !== 18) || (appliedFilters.maxAge && appliedFilters.maxAge !== 35)
+      });
       
       console.log('Fetching match with filters:', {
         hasFilters,
@@ -220,15 +230,33 @@ export default function Swipe() {
         // Check if there's debug info in the error response
         if (errorData.debug) {
           const { totalApprovedUsers, excludedUsers } = errorData.debug;
+          const hasActiveFilters = appliedFilters.interestedIn || 
+                                 (appliedFilters.department && appliedFilters.department.trim() !== '') ||
+                                 appliedFilters.showVerifiedOnly ||
+                                 (appliedFilters.minAge !== 18) || 
+                                 (appliedFilters.maxAge !== 35);
+          
           if (totalApprovedUsers === 0) {
             setMatchError('No approved users found yet. Please check back later once more users join!');
           } else if (totalApprovedUsers === excludedUsers) {
             setMatchError('You\'ve seen all available matches! Check back later for new users.');
           } else {
-            setMatchError(`No matches found with current filters. Try adjusting your filters or check back later! (${totalApprovedUsers} approved users available)`);
+            const filterMessage = hasActiveFilters 
+              ? 'No matches found with current filters. Try adjusting your filters or check back later!'
+              : 'No matches found at this time. Check back later for new users!';
+            setMatchError(`${filterMessage} (${totalApprovedUsers} approved users available)`);
           }
         } else {
-          setMatchError('No matches found. Try adjusting your filters or check back later!');
+          // Determine if filters are active
+          const hasActiveFilters = appliedFilters.interestedIn || 
+                                 (appliedFilters.department && appliedFilters.department.trim() !== '') ||
+                                 appliedFilters.showVerifiedOnly ||
+                                 (appliedFilters.minAge !== 18) || 
+                                 (appliedFilters.maxAge !== 35);
+          const filterMessage = hasActiveFilters 
+            ? 'No matches found with current filters. Try adjusting your filters or check back later!'
+            : 'No matches found at this time. Check back later for new users!';
+          setMatchError(filterMessage);
         }
       } else {
         setMatchError(errorMsg);

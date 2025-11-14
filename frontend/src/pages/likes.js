@@ -46,21 +46,52 @@ export default function Likes() {
 
   const likeBack = async (fromUserId) => {
     try {
-      await apiPost('/api/likes/like-back', { fromUserId });
-      alert('🎉 It\'s a match! You can now start chatting!');
+      console.log('Liking back user:', fromUserId);
+      const response = await apiPost('/api/likes/like-back', { fromUserId });
+      console.log('Like back response:', response);
+      
+      if (response.isMatch) {
+        alert('🎉 It\'s a match! You can now start chatting!');
+      } else {
+        alert('Like sent! You\'ll be notified if they like you back.');
+      }
+      
       await loadLikes();
     } catch (error) {
       console.error('Error liking back:', error);
-      alert('Failed to like back. Please try again.');
+      
+      // Parse error message
+      let errorMsg = 'Failed to like back. Please try again.';
+      try {
+        const errorText = error?.message || error?.toString() || '';
+        const errorData = JSON.parse(errorText);
+        errorMsg = errorData.error || errorText;
+      } catch (parseErr) {
+        errorMsg = error?.message || error?.toString() || errorMsg;
+      }
+      
+      alert(errorMsg);
     }
   };
 
   const pass = async (fromUserId) => {
     try {
-      await apiPost('/api/likes/pass', { fromUserId });
+      const userId = typeof fromUserId === 'object' ? fromUserId.toString() : fromUserId;
+      console.log('Passing on user:', userId);
+      await apiPost('/api/likes/pass', { fromUserId: userId });
       await loadLikes();
     } catch (error) {
       console.error('Error passing:', error);
+      // Parse and show error if needed
+      let errorMsg = 'Failed to pass. Please try again.';
+      try {
+        const errorText = error?.message || error?.toString() || '';
+        const errorData = JSON.parse(errorText);
+        errorMsg = errorData.error || errorText;
+      } catch (parseErr) {
+        errorMsg = error?.message || error?.toString() || errorMsg;
+      }
+      console.error('Pass error:', errorMsg);
     }
   };
 
@@ -143,13 +174,19 @@ export default function Likes() {
                     <div className="like-actions-row">
                       <button
                         className="pass-btn"
-                        onClick={() => pass(user._id)}
+                        onClick={() => {
+                          const userId = typeof user._id === 'object' ? user._id.toString() : user._id;
+                          pass(userId);
+                        }}
                       >
                         Pass
                       </button>
                       <button
                         className="like-back-btn"
-                        onClick={() => likeBack(user._id)}
+                        onClick={() => {
+                          const userId = typeof user._id === 'object' ? user._id.toString() : user._id;
+                          likeBack(userId);
+                        }}
                       >
                         ♥ Like Back
                       </button>

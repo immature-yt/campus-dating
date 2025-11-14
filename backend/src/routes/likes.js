@@ -162,11 +162,103 @@ router.post('/like-back', requireAuth, async (req, res) => {
   try {
     const { fromUserId } = req.body;
 
+    if (!fromUserId) {
+      return res.status(400).json({ error: 'fromUserId is required' });
+    }
+
+    console.log(`Like back request: fromUserId=${fromUserId}, currentUser=${req.user._id}`);
+
     // Convert fromUserId to ObjectId
     let fromUserObjectId;
     try {
       fromUserObjectId = new mongoose.Types.ObjectId(fromUserId);
     } catch (error) {
+      console.error('Invalid fromUserId format:', fromUserId, error);
+      return res.status(400).json({ error: 'Invalid fromUserId format' });
+    }
+
+    // Find the like from them to you (must be pending)
+    const theirLike = await Like.findOne({
+      fromUser: fromUserObjectId,
+      toUser: req.user._id,
+      status: 'pending'
+    });
+
+    console.log('Their like found:', theirLike ? theirLike._id : 'none');
+
+    if (!theirLike) {
+      // Check if they already liked you back or if like exists with different status
+      const existingLike = await Like.findOne({
+        fromUser: fromUserObjectId,
+        toUser: req.user._id
+      });
+      
+      if (existingLike && existingLike.status === 'matched') {
+        return res.status(400).json({ error: 'You are already matched with this user' });
+      }
+      
+      console.error(`Like not found: fromUser=${fromUserObjectId}, toUser=${req.user._id}`);
+      return res.status(404).json({ error: 'Like not found. They may have already liked you back or the like was removed.' });
+    }
+
+    // Update their like to matched
+    theirLike.status = 'matched';
+    await theirLike.save();
+    console.log(`Updated their like to matched: ${theirLike._id}`);
+
+    // Create or update your like to them
+    const yourLike = await Like.findOneAndUpdate(
+      { fromUser: req.user._id, toUser: fromUserObjectId },
+      { fromUser: req.user._id, toUser: fromUserObjectId, status: 'matched' },
+      { upsert: true, new: true }
+    );
+    console.log(`Created/updated your like: ${yourLike._id}, status: ${yourLike.status}`);
+
+    // Log the match
+    try {
+      await AuditLog.create({
+        userId: req.user._id,
+        adminId: null,
+        action: 'match_created',
+        note: `Matched with user ${fromUserObjectId}`
+      });
+    } catch (auditError) {
+      console.error('Error creating audit log:', auditError);
+      // Don't fail the request if audit log fails
+    }
+
+    const matchedUser = await User.findById(fromUserObjectId).select('name email photos verification_status');
+    
+    console.log(`Match created successfully between ${req.user._id} and ${fromUserObjectId}`);
+
+    return res.json({ 
+      message: 'It\'s a match!', 
+      isMatch: true,
+      matchedUser: matchedUser
+    });
+  } catch (error) {
+    console.error('Error liking back:', error);
+    return res.status(500).json({ error: 'Failed to like back: ' + error.message });
+  }
+});
+
+// Pass on someone who liked you
+router.post('/pass', requireAuth, async (req, res) => {
+  try {
+    const { fromUserId } = req.body;
+
+    if (!fromUserId) {
+      return res.status(400).json({ error: 'fromUserId is required' });
+    }
+
+    console.log(`Pass request: fromUserId=${fromUserId}, currentUser=${req.user._id}`);
+
+    // Convert fromUserId to ObjectId
+    let fromUserObjectId;
+    try {
+      fromUserObjectId = new mongoose.Types.ObjectId(fromUserId);
+    } catch (error) {
+      console.error('Invalid fromUserId format:', fromUserId, error);
       return res.status(400).json({ error: 'Invalid fromUserId format' });
     }
 
@@ -178,62 +270,30 @@ router.post('/like-back', requireAuth, async (req, res) => {
     });
 
     if (!theirLike) {
+      // Check if like exists with different status
+      const existingLike = await Like.findOne({
+        fromUser: fromUserObjectId,
+        toUser: req.user._id
+      });
+      
+      if (existingLike) {
+        console.log(`Like already processed with status: ${existingLike.status}`);
+        return res.json({ message: 'Already processed' });
+      }
+      
+      console.log(`Like not found for pass: fromUser=${fromUserObjectId}, toUser=${req.user._id}`);
       return res.status(404).json({ error: 'Like not found' });
     }
 
-    // Update to matched
-    theirLike.status = 'matched';
+    // Update to rejected
+    theirLike.status = 'rejected';
     await theirLike.save();
-
-    // Create or update your like to them
-    const yourLike = await Like.findOneAndUpdate(
-      { fromUser: req.user._id, toUser: fromUserObjectId },
-      { fromUser: req.user._id, toUser: fromUserObjectId, status: 'matched' },
-      { upsert: true, new: true }
-    );
-
-    // Log the match
-    await AuditLog.create({
-      userId: req.user._id,
-      adminId: null,
-      action: 'match_created',
-      note: `Matched with user ${fromUserObjectId}`
-    });
-
-    return res.json({ 
-      message: 'It\'s a match!', 
-      isMatch: true,
-      matchedUser: await User.findById(fromUserObjectId).select('name email photos verification_status')
-    });
-  } catch (error) {
-    console.error('Error liking back:', error);
-    return res.status(500).json({ error: 'Failed to like back' });
-  }
-});
-
-// Pass on someone who liked you
-router.post('/pass', requireAuth, async (req, res) => {
-  try {
-    const { fromUserId } = req.body;
-
-    // Convert fromUserId to ObjectId
-    let fromUserObjectId;
-    try {
-      fromUserObjectId = new mongoose.Types.ObjectId(fromUserId);
-    } catch (error) {
-      return res.status(400).json({ error: 'Invalid fromUserId format' });
-    }
-
-    // Find and update the like
-    await Like.findOneAndUpdate(
-      { fromUser: fromUserObjectId, toUser: req.user._id, status: 'pending' },
-      { status: 'rejected' }
-    );
+    console.log(`Like marked as rejected: ${theirLike._id}`);
 
     return res.json({ message: 'Passed' });
   } catch (error) {
     console.error('Error passing:', error);
-    return res.status(500).json({ error: 'Failed to pass' });
+    return res.status(500).json({ error: 'Failed to pass: ' + error.message });
   }
 });
 

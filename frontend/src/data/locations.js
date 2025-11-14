@@ -10,7 +10,12 @@ export const indiaLocations = [
           'Gayatri Vidya Parishad College of Engineering',
           'Pydah College',
           'Mrs. AVN College',
-          'St. Joseph\'s College for Women'
+          'St. Joseph\'s College for Women',
+          'AU College of Engineering',
+          'GVP College of Engineering',
+          'Andhra Medical College',
+          'GITAM Institute of Management',
+          'Vizag Institute of Technology'
         ] 
       },
       { 
@@ -21,8 +26,75 @@ export const indiaLocations = [
           'SRM University - AP',
           'NRI Institute of Technology',
           'V.R. Siddhartha Engineering College',
-          'Siddhartha College of Arts, Science & Commerce'
+          'Siddhartha College of Arts, Science & Commerce',
+          'Vijayawada Medical College',
+          'Lakireddy Bali Reddy College of Engineering',
+          'Prasad V. Potluri Siddhartha Institute of Technology',
+          'Nalanda Institute of Engineering and Technology'
         ] 
+      },
+      {
+        name: 'Guntur',
+        colleges: [
+          'Acharya Nagarjuna University',
+          'NRI Medical College',
+          'Vignan\'s Foundation for Science, Technology and Research',
+          'Lakireddy Bali Reddy College',
+          'RVR & JC College of Engineering',
+          'Guntur Medical College'
+        ]
+      },
+      {
+        name: 'Tirupati',
+        colleges: [
+          'Sri Venkateswara University',
+          'Sri Padmavati Mahila Visvavidyalayam',
+          'SV University College of Engineering',
+          'SV Institute of Medical Sciences',
+          'Sree Vidyanikethan Engineering College',
+          'Vignan\'s Institute of Information Technology'
+        ]
+      },
+      {
+        name: 'Kakinada',
+        colleges: [
+          'Jawaharlal Nehru Technological University Kakinada',
+          'Adikavi Nannaya University',
+          'College of Engineering Kakinada',
+          'Pragati Engineering College',
+          'Raghu Engineering College',
+          'Sanketika Vidya Parishad Engineering College'
+        ]
+      },
+      {
+        name: 'Rajahmundry',
+        colleges: [
+          'Adikavi Nannaya University',
+          'Godavari Institute of Engineering and Technology',
+          'Sri Vasavi Engineering College',
+          'College of Engineering Rajahmundry',
+          'Sir C.R. Reddy College'
+        ]
+      },
+      {
+        name: 'Nellore',
+        colleges: [
+          'Vikrama Simhapuri University',
+          'Narayana Engineering College',
+          'Sree Vidyanikethan Engineering College',
+          'Nellore Institute of Technology and Sciences',
+          'PBR Visvodaya Institute of Technology and Science'
+        ]
+      },
+      {
+        name: 'Kurnool',
+        colleges: [
+          'Rayalaseema University',
+          'Sri Krishnadevaraya University',
+          'G. Pulla Reddy Engineering College',
+          'Kurnool Medical College',
+          'Sree Vidyanikethan Engineering College'
+        ]
       }
     ]
   },
@@ -60,7 +132,13 @@ export const indiaLocations = [
           'Assam Medical College',
           'Handique Girls\' College',
           'B. Borooah College',
-          'K.C. Das Commerce College'
+          'K.C. Das Commerce College',
+          'Indian Institute of Management (IIM) Shillong',
+          'Gauhati Medical College',
+          'Dispur Law College',
+          'Assam Don Bosco University',
+          'Royal Global University',
+          'Kaziranga University'
         ] 
       },
       { 
@@ -69,8 +147,69 @@ export const indiaLocations = [
           'Dibrugarh University',
           'Assam Medical College',
           'Dibrugarh Commerce College',
-          'Dibrugarh College'
+          'Dibrugarh College',
+          'Dibrugarh Polytechnic',
+          'Dibrugarh Hanumanbax Surajmall Kanoi College'
         ] 
+      },
+      {
+        name: 'Silchar',
+        colleges: [
+          'Assam University',
+          'National Institute of Technology (NIT) Silchar',
+          'Gurucharan College',
+          'Cachar College',
+          'Silchar Medical College',
+          'Assam University Silchar'
+        ]
+      },
+      {
+        name: 'Jorhat',
+        colleges: [
+          'Jorhat Institute of Science and Technology',
+          'Jorhat Engineering College',
+          'Jorhat Medical College',
+          'J.B. College',
+          'Bahona College',
+          'D.C.B. Girls\' College'
+        ]
+      },
+      {
+        name: 'Tezpur',
+        colleges: [
+          'Tezpur University',
+          'Tezpur Government College',
+          'Darrang College',
+          'Sonitpur College',
+          'Napaam College'
+        ]
+      },
+      {
+        name: 'Nagaon',
+        colleges: [
+          'Nowgong College',
+          'Nagaon College',
+          'Kaliabor College',
+          'Nagaon Law College'
+        ]
+      },
+      {
+        name: 'Tinsukia',
+        colleges: [
+          'Tinsukia College',
+          'Duliajan College',
+          'Digboi College',
+          'Tinsukia Commerce College'
+        ]
+      },
+      {
+        name: 'Barpeta',
+        colleges: [
+          'Barpeta Vidyapith',
+          'Barpeta College',
+          'Barpeta Road College',
+          'Sorbhog College'
+        ]
       }
     ]
   },
@@ -87,7 +226,14 @@ export const indiaLocations = [
           'Patna College',
           'Bihar National College',
           'Patna Women\'s College',
-          'Anugrah Narayan College'
+          'Anugrah Narayan College',
+          'Patna Science College',
+          'B.N. College',
+          'A.N. College',
+          'Patna Law College',
+          'Magadh Mahila College',
+          'J.D. Women\'s College',
+          'St. Xavier\'s College Patna'
         ] 
       },
       { 
@@ -95,8 +241,73 @@ export const indiaLocations = [
         colleges: [
           'Magadh University',
           'Gaya College',
-          'Maharishi University of Information Technology'
+          'Maharishi University of Information Technology',
+          'Gaya College of Engineering',
+          'Magadh University Gaya',
+          'Women\'s College Gaya'
         ] 
+      },
+      {
+        name: 'Bhagalpur',
+        colleges: [
+          'Bhagalpur University',
+          'Tilka Manjhi Bhagalpur University',
+          'Jawaharlal Nehru Medical College',
+          'Bhagalpur College of Engineering',
+          'S.M. College',
+          'T.N.B. College'
+        ]
+      },
+      {
+        name: 'Muzaffarpur',
+        colleges: [
+          'B.R. Ambedkar Bihar University',
+          'Muzaffarpur Institute of Technology',
+          'Ram Dayalu Singh College',
+          'Langat Singh College',
+          'Muzaffarpur Medical College',
+          'Women\'s College Muzaffarpur'
+        ]
+      },
+      {
+        name: 'Darbhanga',
+        colleges: [
+          'Lalit Narayan Mithila University',
+          'C.M. College',
+          'M.L.S.M. College',
+          'Darbhanga Medical College',
+          'Marwari College',
+          'Millat College'
+        ]
+      },
+      {
+        name: 'Purnea',
+        colleges: [
+          'Purnea University',
+          'Purnea College',
+          'B.N. Mandal University',
+          'Women\'s College Purnea',
+          'S.K. College'
+        ]
+      },
+      {
+        name: 'Ara',
+        colleges: [
+          'Veer Kunwar Singh University',
+          'Jagdam College',
+          'Maharaja College',
+          'S.N. Sinha College',
+          'M.S. College'
+        ]
+      },
+      {
+        name: 'Begusarai',
+        colleges: [
+          'T.P.S. College',
+          'M.S. College',
+          'Begusarai College',
+          'Women\'s College Begusarai'
+        ]
       }
     ]
   },
@@ -160,7 +371,14 @@ export const indiaLocations = [
           'CEPT University',
           'St. Xavier\'s College Ahmedabad',
           'HL College of Commerce',
-          'Government Medical College Ahmedabad'
+          'Government Medical College Ahmedabad',
+          'Gujarat Technological University',
+          'DA-IICT',
+          'Institute of Management Technology',
+          'Nirma Institute of Technology',
+          'L.J. Institute of Engineering and Technology',
+          'Gujarat Vidyapith',
+          'Gujarat Law Society'
         ] 
       },
       { 
@@ -170,8 +388,80 @@ export const indiaLocations = [
           'Veer Narmad South Gujarat University',
           'Sardar Patel College of Engineering',
           'Surat Municipal Institute of Medical Education and Research',
-          'Amroli Education Society College'
+          'Amroli Education Society College',
+          'Sardar Vallabhbhai Patel Institute of Technology',
+          'Sardar Vallabhbhai National Institute of Technology',
+          'Government Engineering College Surat',
+          'Surat Municipal Corporation Medical College',
+          'Sir P.T. Sarvajanik College of Science'
         ] 
+      },
+      {
+        name: 'Vadodara',
+        colleges: [
+          'Maharaja Sayajirao University of Baroda',
+          'Indian Institute of Information Technology Vadodara',
+          'Baroda Medical College',
+          'Faculty of Technology and Engineering',
+          'M.S. University of Baroda',
+          'Parul University',
+          'Sigma Institute of Engineering',
+          'Ganpat University'
+        ]
+      },
+      {
+        name: 'Rajkot',
+        colleges: [
+          'Saurashtra University',
+          'Marwadi University',
+          'Government Engineering College Rajkot',
+          'Atmiya Institute of Technology and Science',
+          'Darshan Institute of Engineering and Technology',
+          'RK University',
+          'Shree Swaminarayan College of Engineering and Technology'
+        ]
+      },
+      {
+        name: 'Gandhinagar',
+        colleges: [
+          'Gujarat Technological University',
+          'Institute of Infrastructure Technology Research and Management',
+          'Pandit Deendayal Petroleum University',
+          'National Institute of Design Gandhinagar',
+          'Gujarat National Law University',
+          'Gujarat Forensic Sciences University'
+        ]
+      },
+      {
+        name: 'Anand',
+        colleges: [
+          'Charotar University of Science and Technology',
+          'Vallabh Vidyanagar',
+          'Sardar Patel University',
+          'Charotar Institute of Technology',
+          'Anand Agricultural University',
+          'BVM Engineering College'
+        ]
+      },
+      {
+        name: 'Bhavnagar',
+        colleges: [
+          'Bhavnagar University',
+          'Government Engineering College Bhavnagar',
+          'Samaldas Arts College',
+          'Takshashila Science College',
+          'Shree Swaminarayan Institute of Technology'
+        ]
+      },
+      {
+        name: 'Jamnagar',
+        colleges: [
+          'Saurashtra University',
+          'Government Engineering College Jamnagar',
+          'M.P. Shah Medical College',
+          'M.S. University',
+          'Vivekanand College'
+        ]
       }
     ]
   },
@@ -272,7 +562,16 @@ export const indiaLocations = [
           'BMS College of Engineering',
           'MS Ramaiah Institute of Technology',
           'Bangalore Medical College',
-          'National Law School of India University'
+          'National Law School of India University',
+          'Nitte Meenakshi Institute of Technology',
+          'Dayananda Sagar College of Engineering',
+          'Ramaiah Institute of Technology',
+          'Bangalore Institute of Technology',
+          'SJB Institute of Technology',
+          'NMAM Institute of Technology',
+          'New Horizon College of Engineering',
+          'Acharya Institute of Technology',
+          'Bangalore Institute of Management Studies'
         ] 
       },
       { 
@@ -283,8 +582,86 @@ export const indiaLocations = [
           'Maharaja\'s College Mysore',
           'Vidya Vardhaka College of Engineering',
           'Mysore Medical College',
-          'St. Philomena\'s College'
+          'St. Philomena\'s College',
+          'JSS Science and Technology University',
+          'National Institute of Engineering',
+          'Sri Jayachamarajendra College of Engineering',
+          'Maharani\'s Science College for Women',
+          'Yuvaraja\'s College'
         ] 
+      },
+      {
+        name: 'Mangaluru',
+        colleges: [
+          'Manipal Academy of Higher Education',
+          'Mangalore University',
+          'St. Aloysius College',
+          'St. Joseph Engineering College',
+          'NMAM Institute of Technology',
+          'Canara Engineering College',
+          'Sahyadri College of Engineering and Management',
+          'Mangalore Institute of Technology and Engineering',
+          'Father Muller Medical College',
+          'Kasturba Medical College Mangalore'
+        ]
+      },
+      {
+        name: 'Hubballi',
+        colleges: [
+          'Karnataka University',
+          'Indian Institute of Technology (IIT) Dharwad',
+          'B.V.B. College of Engineering and Technology',
+          'SDM College of Engineering and Technology',
+          'KLE Technological University',
+          'Gogte Institute of Technology',
+          'Karnataka Institute of Medical Sciences',
+          'Karnatak University Dharwad'
+        ]
+      },
+      {
+        name: 'Belagavi',
+        colleges: [
+          'Visvesvaraya Technological University',
+          'KLE Technological University',
+          'Angadi Institute of Technology and Management',
+          'Gogte Institute of Technology',
+          'KLE University',
+          'Jain College Belagavi',
+          'Belagavi Institute of Medical Sciences'
+        ]
+      },
+      {
+        name: 'Kalaburagi',
+        colleges: [
+          'Gulbarga University',
+          'Central University of Karnataka',
+          'Acharya Prafulla Chandra College',
+          'Government Engineering College Kalaburagi',
+          'Sharnbasva University',
+          'Kalaburagi Medical College'
+        ]
+      },
+      {
+        name: 'Udupi',
+        colleges: [
+          'Manipal Academy of Higher Education',
+          'Manipal University',
+          'Kasturba Medical College Manipal',
+          'MIT Manipal',
+          'St. Mary\'s College',
+          'MGM College Udupi'
+        ]
+      },
+      {
+        name: 'Davangere',
+        colleges: [
+          'Davangere University',
+          'Bapuji Institute of Engineering and Technology',
+          'JSS Academy of Higher Education & Research',
+          'JJM Medical College',
+          'SJCE Davangere',
+          'Sambhram Institute of Technology'
+        ]
       }
     ]
   },
@@ -365,7 +742,17 @@ export const indiaLocations = [
           'Grant Medical College',
           'J.J. Hospital',
           'Sir J.J. Institute of Applied Art',
-          'Government Law College Mumbai'
+          'Government Law College Mumbai',
+          'Jai Hind College',
+          'K.C. College',
+          'R.D. National College',
+          'Wilson College',
+          'Sophia College for Women',
+          'St. Xavier\'s College',
+          'K.J. Somaiya College of Engineering',
+          'Dwarkadas J. Sanghvi College of Engineering',
+          'Mukesh Patel School of Technology Management and Engineering',
+          'SVKM\'s NMIMS University'
         ] 
       },
       { 
@@ -382,8 +769,96 @@ export const indiaLocations = [
           'Army Institute of Technology',
           'Pune Institute of Computer Technology',
           'B.J. Medical College',
-          'National Defence Academy'
+          'National Defence Academy',
+          'Symbiosis College of Arts and Commerce',
+          'MIT World Peace University',
+          'Vishwakarma Institute of Technology',
+          'DY Patil College of Engineering',
+          'AISSMS College of Engineering',
+          'PICT Pune',
+          'Indira College of Engineering and Management',
+          'Sinhgad College of Engineering',
+          'Maharashtra Institute of Technology'
         ] 
+      },
+      {
+        name: 'Nagpur',
+        colleges: [
+          'Rashtrasant Tukadoji Maharaj Nagpur University',
+          'Visvesvaraya National Institute of Technology',
+          'Government Medical College Nagpur',
+          'Laxminarayan Institute of Technology',
+          'G.H. Raisoni College of Engineering',
+          'St. Vincent Pallotti College',
+          'Hislop College',
+          'Institute of Management Technology Nagpur',
+          'Priyadarshini College of Engineering',
+          'Kamla Nehru Mahavidyalaya'
+        ]
+      },
+      {
+        name: 'Nashik',
+        colleges: [
+          'KTHM College',
+          'Sandip University',
+          'MET\'s Institute of Engineering',
+          'Sinhgad College of Engineering Nashik',
+          'KK Wagh College of Engineering',
+          'Nashik Engineering College',
+          'Government Medical College Nashik',
+          'Bytco College',
+          'Mahatma Gandhi Mission\'s College of Engineering'
+        ]
+      },
+      {
+        name: 'Aurangabad',
+        colleges: [
+          'Dr. Babasaheb Ambedkar Marathwada University',
+          'Government College of Engineering Aurangabad',
+          'Jawaharlal Nehru Engineering College',
+          'Mahatma Gandhi Mission\'s College of Engineering',
+          'Aurangabad College of Engineering',
+          'Government Medical College Aurangabad',
+          'Maulana Azad College',
+          'Deogiri College'
+        ]
+      },
+      {
+        name: 'Kolhapur',
+        colleges: [
+          'Shivaji University',
+          'Government College of Engineering Kolhapur',
+          'D.Y. Patil College of Engineering and Technology',
+          'Kolhapur Institute of Technology',
+          'Rajarambapu Institute of Technology',
+          'Government Medical College Kolhapur',
+          'Rayat Shikshan Sanstha\'s College',
+          'New College Kolhapur'
+        ]
+      },
+      {
+        name: 'Amravati',
+        colleges: [
+          'Sant Gadge Baba Amravati University',
+          'Government College of Engineering Amravati',
+          'Prof. Ram Meghe Institute of Technology and Research',
+          'P. R. Pote Patil College of Engineering',
+          'Government Medical College Amravati',
+          'Amravati University',
+          'Vidyabharti College'
+        ]
+      },
+      {
+        name: 'Solapur',
+        colleges: [
+          'Solapur University',
+          'Walchand College of Engineering',
+          'Dayanand College of Engineering',
+          'Government College of Engineering Solapur',
+          'Sangmeshwar College',
+          'Solapur Medical College',
+          'Willingdon College'
+        ]
       }
     ]
   },
@@ -600,7 +1075,16 @@ export const indiaLocations = [
           'VIT University Chennai',
           'SRM Institute of Science and Technology',
           'National Law School',
-          'MOP Vaishnav College for Women'
+          'MOP Vaishnav College for Women',
+          'Ethiraj College for Women',
+          'Women\'s Christian College',
+          'Queen Mary\'s College',
+          'DG Vaishnav College',
+          'Sri Sivasubramaniya Nadar College of Engineering',
+          'SSN College of Engineering',
+          'Rajalakshmi Engineering College',
+          'Hindustan Institute of Technology and Science',
+          'Saveetha Engineering College'
         ] 
       },
       { 
@@ -614,8 +1098,93 @@ export const indiaLocations = [
           'Sri Ramakrishna Engineering College',
           'Government College of Technology',
           'PSG College of Arts and Science',
-          'St. Joseph\'s College Coimbatore'
+          'St. Joseph\'s College Coimbatore',
+          'PSG Institute of Technology and Applied Research',
+          'Sri Krishna College of Engineering and Technology',
+          'Karpagam College of Engineering',
+          'Kongu Engineering College',
+          'Coimbatore Medical College',
+          'PSG College of Arts'
         ] 
+      },
+      {
+        name: 'Madurai',
+        colleges: [
+          'Madurai Kamaraj University',
+          'Thiagarajar College of Engineering',
+          'Thiagarajar College',
+          'The American College',
+          'Madurai Medical College',
+          'PSNA College of Engineering and Technology',
+          'KLN College of Engineering',
+          'Velammal Engineering College',
+          'Fatima Michael College of Engineering and Technology',
+          'Sethu Institute of Technology'
+        ]
+      },
+      {
+        name: 'Tiruchirappalli',
+        colleges: [
+          'National Institute of Technology (NIT) Trichy',
+          'Indian Institute of Management (IIM) Trichy',
+          'Bharathidasan University',
+          'St. Joseph\'s College Trichy',
+          'Bishop Heber College',
+          'Jamal Mohamed College',
+          'National College Trichy',
+          'Government College of Engineering Trichy',
+          'Saranathan College of Engineering',
+          'M.A.M. College of Engineering'
+        ]
+      },
+      {
+        name: 'Salem',
+        colleges: [
+          'Periyar University',
+          'Government College of Engineering Salem',
+          'Sona College of Technology',
+          'KSR College of Engineering',
+          'Kongu Engineering College Salem',
+          'Salem Medical College',
+          'Salem College',
+          'JKK Nataraja College of Arts and Science'
+        ]
+      },
+      {
+        name: 'Tirunelveli',
+        colleges: [
+          'Manonmaniam Sundaranar University',
+          'Tirunelveli Medical College',
+          'St. John\'s College',
+          'Sarah Tucker College',
+          'SCAD College of Engineering and Technology',
+          'Francis Xavier Engineering College',
+          'P.S.R. Engineering College'
+        ]
+      },
+      {
+        name: 'Erode',
+        colleges: [
+          'Kongu Engineering College',
+          'Bannari Amman Institute of Technology',
+          'Government College of Engineering Erode',
+          'K.S.R. College of Engineering',
+          'Erode Sengunthar Engineering College',
+          'Velalar College of Engineering and Technology',
+          'Erode Arts and Science College'
+        ]
+      },
+      {
+        name: 'Vellore',
+        colleges: [
+          'Vellore Institute of Technology (VIT)',
+          'Christian Medical College Vellore',
+          'Thanthai Periyar Government Institute of Technology',
+          'Dhanalakshmi Srinivasan College of Engineering',
+          'Saveetha Engineering College',
+          'VIT University Vellore',
+          'Sree Sastha Institute of Engineering and Technology'
+        ]
       }
     ]
   },
@@ -689,7 +1258,12 @@ export const indiaLocations = [
           'Isabella Thoburn College',
           'St. Francis\' College',
           'CMS College',
-          'Amity University Lucknow'
+          'Amity University Lucknow',
+          'Integral University',
+          'Babasaheb Bhimrao Ambedkar University',
+          'Dr. Ram Manohar Lohia Institute of Medical Sciences',
+          'Institute of Engineering and Technology',
+          'Amity University Lucknow Campus'
         ] 
       },
       { 
@@ -700,8 +1274,89 @@ export const indiaLocations = [
           'Jaypee Institute of Information Technology',
           'Galgotias University',
           'Greater Noida Institute of Technology',
-          'Noida Institute of Engineering and Technology'
+          'Noida Institute of Engineering and Technology',
+          'JSS Academy of Technical Education',
+          'NIIT University',
+          'IIMT College of Engineering',
+          'ITS Engineering College',
+          'Greater Noida Institute of Management'
         ] 
+      },
+      {
+        name: 'Kanpur',
+        colleges: [
+          'Indian Institute of Technology (IIT) Kanpur',
+          'Harcourt Butler Technical University',
+          'Chandra Shekhar Azad University of Agriculture and Technology',
+          'Government Medical College Kanpur',
+          'Kanpur University',
+          'P.P.N. College',
+          'D.B.S. College',
+          'G.S.V.M. Medical College',
+          'IIT Kanpur',
+          'Dr. Ambedkar Institute of Technology'
+        ]
+      },
+      {
+        name: 'Varanasi',
+        colleges: [
+          'Indian Institute of Technology (IIT) BHU',
+          'Banaras Hindu University',
+          'Sampurnanand Sanskrit University',
+          'Mahatma Gandhi Kashi Vidyapith',
+          'Institute of Medical Sciences BHU',
+          'Central Institute of Higher Tibetan Studies',
+          'St. John\'s College',
+          'Arya Mahila P.G. College'
+        ]
+      },
+      {
+        name: 'Allahabad',
+        colleges: [
+          'Allahabad University',
+          'Motilal Nehru National Institute of Technology',
+          'Allahabad Agricultural Institute',
+          'Allahabad Degree College',
+          'Ewing Christian College',
+          'Allahabad Medical College',
+          'Allahabad State University'
+        ]
+      },
+      {
+        name: 'Agra',
+        colleges: [
+          'Dr. B.R. Ambedkar University',
+          'Dayalbagh Educational Institute',
+          'St. John\'s College',
+          'R.B.S. College',
+          'Agra College',
+          'S.N. Medical College',
+          'Faculty of Engineering and Technology'
+        ]
+      },
+      {
+        name: 'Meerut',
+        colleges: [
+          'Meerut University',
+          'Chaudhary Charan Singh University',
+          'Meerut Institute of Engineering and Technology',
+          'Meerut College',
+          'Lala Lajpat Rai Memorial Medical College',
+          'Shobhit University',
+          'Swami Vivekanand Subharti University'
+        ]
+      },
+      {
+        name: 'Ghaziabad',
+        colleges: [
+          'ABES Engineering College',
+          'I.T.S. Engineering College',
+          'Raj Kumar Goel Institute of Technology',
+          'Dronacharya College of Engineering',
+          'IMS Engineering College',
+          'GL Bajaj Institute of Technology and Management',
+          'Ajay Kumar Garg Engineering College'
+        ]
       }
     ]
   },
@@ -751,7 +1406,14 @@ export const indiaLocations = [
           'Heritage Institute of Technology',
           'Jadavpur University Faculty of Engineering',
           'Indian Statistical Institute',
-          'West Bengal National University of Juridical Sciences'
+          'West Bengal National University of Juridical Sciences',
+          'Indian Institute of Engineering Science and Technology',
+          'Calcutta University',
+          'St. Xavier\'s University',
+          'Techno India University',
+          'RCC Institute of Information Technology',
+          'Techno Engineering College',
+          'Future Institute of Engineering and Management'
         ] 
       },
       { 
@@ -760,8 +1422,72 @@ export const indiaLocations = [
           'University of North Bengal',
           'Siliguri College',
           'Techno India University',
-          'North Bengal Medical College'
+          'North Bengal Medical College',
+          'North Bengal University',
+          'Siliguri Institute of Technology',
+          'Darjeeling Government College'
         ] 
+      },
+      {
+        name: 'Kharagpur',
+        colleges: [
+          'Indian Institute of Technology (IIT) Kharagpur',
+          'IIT Kharagpur',
+          'Indian Institute of Technology',
+          'Hijli College',
+          'Kharagpur College'
+        ]
+      },
+      {
+        name: 'Durgapur',
+        colleges: [
+          'National Institute of Technology (NIT) Durgapur',
+          'Bengal College of Engineering and Technology',
+          'Durgapur Government College',
+          'Durgapur Institute of Advanced Technology and Management',
+          'B.C. Roy Engineering College',
+          'Durgapur Society of Management Science'
+        ]
+      },
+      {
+        name: 'Asansol',
+        colleges: [
+          'Kazi Nazrul University',
+          'Asansol Engineering College',
+          'Asansol Girls\' College',
+          'Government College of Engineering and Ceramic Technology',
+          'Asansol Government College'
+        ]
+      },
+      {
+        name: 'Bardhaman',
+        colleges: [
+          'Burdwan University',
+          'Burdwan Medical College',
+          'University of Burdwan',
+          'Burdwan Raj College',
+          'Burdwan Christian College'
+        ]
+      },
+      {
+        name: 'Howrah',
+        colleges: [
+          'Howrah Zilla School',
+          'Ramkrishna Mission Vidyamandira',
+          'Bhatter College',
+          'Howrah Girls\' College',
+          'Government College of Engineering and Textile Technology'
+        ]
+      },
+      {
+        name: 'Hooghly',
+        colleges: [
+          'University of Calcutta',
+          'Hooghly Mohsin College',
+          'Serampore College',
+          'Chinsurah Government College',
+          'Hooghly Engineering and Technology College'
+        ]
       }
     ]
   },

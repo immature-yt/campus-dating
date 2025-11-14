@@ -25,27 +25,42 @@ async function sampleApprovedUser({ college, excludeId, gender, minAge, maxAge, 
     matchStage._id = { $nin: idsToExclude.map(id => new Types.ObjectId(id)) };
   }
   
+  // Also exclude users who have been liked or skipped
+  // This will be handled by the excludeIds parameter from frontend
+  
   // Gender filter
-  if (gender) {
+  if (gender && gender !== '') {
     matchStage.gender = gender;
   }
   
   // Age filter
   if (minAge || maxAge) {
     matchStage.age = {};
-    if (minAge) matchStage.age.$gte = parseInt(minAge);
-    if (maxAge) matchStage.age.$lte = parseInt(maxAge);
+    if (minAge) {
+      const minAgeNum = parseInt(minAge);
+      if (!isNaN(minAgeNum) && minAgeNum > 0) {
+        matchStage.age.$gte = minAgeNum;
+      }
+    }
+    if (maxAge) {
+      const maxAgeNum = parseInt(maxAge);
+      if (!isNaN(maxAgeNum) && maxAgeNum > 0) {
+        matchStage.age.$lte = maxAgeNum;
+      }
+    }
   }
   
   // Department filter
-  if (department) {
+  if (department && department !== '') {
     matchStage.department = { $regex: new RegExp(escapeRegExp(department), 'i') };
   }
   
-  // Verified only filter
+  // Verified only filter (already set to 'approved' above, but double-check)
   if (verifiedOnly === 'true' || verifiedOnly === true) {
     matchStage.verification_status = 'approved';
   }
+  
+  console.log('Match query filters:', JSON.stringify(matchStage, null, 2));
 
   const [match] = await User.aggregate([
     { $match: matchStage },

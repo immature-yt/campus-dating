@@ -139,16 +139,23 @@ export default function Swipe() {
         exclude: excludeUsers.join(',')
       });
       
-      // Only apply filters if explicitly requested
-      if (useFilters || appliedFilters.interestedIn) {
+      // Always apply filters if they are set (not default values)
+      const hasFilters = useFilters || 
+                        appliedFilters.interestedIn || 
+                        appliedFilters.department || 
+                        appliedFilters.showVerifiedOnly ||
+                        (appliedFilters.minAge && appliedFilters.minAge !== 18) ||
+                        (appliedFilters.maxAge && appliedFilters.maxAge !== 35);
+      
+      if (hasFilters) {
         if (appliedFilters.interestedIn) {
           params.append('gender', appliedFilters.interestedIn);
         }
-        if (appliedFilters.minAge) {
-          params.append('minAge', appliedFilters.minAge);
+        if (appliedFilters.minAge && appliedFilters.minAge !== 18) {
+          params.append('minAge', appliedFilters.minAge.toString());
         }
-        if (appliedFilters.maxAge) {
-          params.append('maxAge', appliedFilters.maxAge);
+        if (appliedFilters.maxAge && appliedFilters.maxAge !== 35) {
+          params.append('maxAge', appliedFilters.maxAge.toString());
         }
         if (appliedFilters.department) {
           params.append('department', appliedFilters.department);
@@ -157,6 +164,12 @@ export default function Swipe() {
           params.append('verifiedOnly', 'true');
         }
       }
+      
+      console.log('Fetching match with filters:', {
+        hasFilters,
+        appliedFilters,
+        params: params.toString()
+      });
       
       const response = await apiGet(`/api/match/find?${params.toString()}`);
       if (response.match) {
@@ -185,9 +198,14 @@ export default function Swipe() {
   };
 
   const handleReaction = async (action) => {
-    if (!match) return;
+    if (!match || !match._id) {
+      console.error('Invalid match data:', match);
+      return;
+    }
+    
+    const userId = match._id.toString();
     const entry = {
-      userId: match._id || `anon-${Date.now()}`,
+      userId: userId,
       name: match.name,
       action,
       timestamp: new Date().toISOString()
@@ -197,31 +215,46 @@ export default function Swipe() {
 
     if (action === 'like') {
       try {
+        console.log('Sending like to user:', userId);
         // Send like to backend
-        const response = await apiPost('/api/likes/send', { toUserId: entry.userId });
+        const response = await apiPost('/api/likes/send', { toUserId: userId });
+        console.log('Like response:', response);
         
         if (response.isMatch) {
           // Show match notification
           alert(`🎉 It's a match with ${match.name}! You can now chat!`);
+        } else {
+          // Show confirmation that like was sent
+          console.log('Like sent successfully');
         }
         
         // Add to liked list to prevent showing again
         const likedUsers = safeParse('campus-dating-liked-users', []);
-        persistList('campus-dating-liked-users', [entry.userId, ...likedUsers]);
+        if (!likedUsers.includes(userId)) {
+          persistList('campus-dating-liked-users', [userId, ...likedUsers]);
+        }
       } catch (error) {
         console.error('Error sending like:', error);
+        alert(`Failed to send like: ${error.message || 'Please try again'}`);
         // Still prevent showing again locally
         const likedUsers = safeParse('campus-dating-liked-users', []);
-        persistList('campus-dating-liked-users', [entry.userId, ...likedUsers]);
+        if (!likedUsers.includes(userId)) {
+          persistList('campus-dating-liked-users', [userId, ...likedUsers]);
+        }
       }
     } else if (action === 'skip') {
       // Add to skipped list to prevent showing again
       const skippedUsers = safeParse('campus-dating-skipped-users', []);
-      persistList('campus-dating-skipped-users', [entry.userId, ...skippedUsers]);
+      if (!skippedUsers.includes(userId)) {
+        persistList('campus-dating-skipped-users', [userId, ...skippedUsers]);
+      }
     }
 
     setMatch(null);
-    await fetchMatch();
+    // Use current filters when fetching next match
+    const hasActiveFilters = appliedFilters.interestedIn || appliedFilters.department || appliedFilters.showVerifiedOnly || 
+                             (appliedFilters.minAge !== 18) || (appliedFilters.maxAge !== 35);
+    await fetchMatch(hasActiveFilters);
   };
 
   if (!me) {

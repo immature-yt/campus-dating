@@ -78,7 +78,14 @@ export function initializeSocket(server) {
 
     // Video call signaling
     socket.on('call:offer', ({ toUserId, offer, chatId }) => {
+      // Emit to both user room and chat room to ensure delivery
       socket.to(`user:${toUserId}`).emit('call:offer', {
+        fromUserId: socket.userId,
+        fromUserName: socket.user.name,
+        offer,
+        chatId
+      });
+      socket.to(`chat:${chatId}`).emit('call:offer', {
         fromUserId: socket.userId,
         fromUserName: socket.user.name,
         offer,
@@ -107,17 +114,32 @@ export function initializeSocket(server) {
     });
 
     // Game events
-    socket.on('game:start', ({ toUserId, gameType }) => {
+    socket.on('game:start', ({ toUserId, gameType, question }) => {
       socket.to(`user:${toUserId}`).emit('game:start', {
         fromUserId: socket.userId,
         fromUserName: socket.user.name,
-        gameType
+        gameType,
+        question
+      });
+      // Also emit to chat room
+      socket.to(`chat:${toUserId}`).emit('game:start', {
+        fromUserId: socket.userId,
+        fromUserName: socket.user.name,
+        gameType,
+        question
       });
     });
 
-    socket.on('game:response', ({ toUserId, response }) => {
+    socket.on('game:response', ({ toUserId, gameId, response }) => {
       socket.to(`user:${toUserId}`).emit('game:response', {
         fromUserId: socket.userId,
+        gameId,
+        response
+      });
+      // Also emit to chat room
+      socket.to(`chat:${toUserId}`).emit('game:response', {
+        fromUserId: socket.userId,
+        gameId,
         response
       });
     });

@@ -3,7 +3,6 @@ import { useRouter } from 'next/router';
 import { apiGet, apiPost, apiDelete } from '../lib/api';
 import { getSocket } from '../lib/socket';
 import VideoCall from '../components/VideoCall';
-import TruthDareGame from '../components/TruthDareGame';
 
 // Custom Voice Note Player Component
 function VoiceNotePlayer({ audioUrl }) {
@@ -144,7 +143,8 @@ export default function Chats() {
   const [typingTimeout, setTypingTimeout] = useState(null);
   const [showReactionPicker, setShowReactionPicker] = useState(null);
   const [showVideoCall, setShowVideoCall] = useState(false);
-  const [showGame, setShowGame] = useState(false);
+  const [incomingCallData, setIncomingCallData] = useState(null);
+  const [activeGame, setActiveGame] = useState(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const streamRef = useRef(null);
@@ -188,29 +188,33 @@ export default function Chats() {
 
       // Handle typing indicators
       socket.on('typing:start', ({ userId, userName }) => {
-        if (userId !== me._id) {
+        if (userId !== me._id && userId === chatId) {
           setIsTyping(true);
         }
       });
 
       socket.on('typing:stop', ({ userId }) => {
-        if (userId !== me._id) {
+        if (userId !== me._id && userId === chatId) {
           setIsTyping(false);
         }
       });
 
-      // Handle incoming video call
-      socket.on('call:offer', ({ fromUserId, fromUserName, offer, chatId: callChatId }) => {
-        if (callChatId === chatId) {
-          // Show incoming call UI
+      // Handle incoming video call - listen globally
+      const handleIncomingCall = ({ fromUserId, fromUserName, offer, chatId: callChatId }) => {
+        // Show call notification if it's for current chat or if we're not in a chat
+        if (!chatId || callChatId === chatId || fromUserId === chatId) {
+          // Show incoming call UI with accept/reject options
           setShowVideoCall(true);
+          setIncomingCallData({ fromUserId, fromUserName, chatId: callChatId || chatId });
         }
-      });
+      };
+
+      socket.on('call:offer', handleIncomingCall);
 
       // Handle game start
       socket.on('game:start', ({ fromUserId, gameType }) => {
         if (fromUserId === chatId) {
-          setShowGame(true);
+          // Don't show modal, will be handled as system message
         }
       });
 
@@ -220,7 +224,7 @@ export default function Chats() {
         }
         socket.off('typing:start');
         socket.off('typing:stop');
-        socket.off('call:offer');
+        socket.off('call:offer', handleIncomingCall);
         socket.off('game:start');
       };
     }
@@ -1033,6 +1037,130 @@ export default function Chats() {
     return reactions?.some(r => r.emoji === emoji && r.userId?.toString() === me?._id?.toString());
   };
 
+  // Start Truth/Dare game - sends system message
+  const startTruthDareGame = async () => {
+    try {
+      const response = await apiGet('/api/game/random');
+      const gameMessage = {
+        id: `game-${Date.now()}`,
+        type: 'game',
+        gameType: response.type,
+        question: response.question,
+        sender: 'system',
+        timestamp: new Date().toISOString(),
+        optimistic: true,
+        gameState: 'pending',
+        skipsUsed: 0,
+        skipsRemaining: 2
+      };
+      
+      // Add to chat messages
+      setChatMessages(prev => [...prev, gameMessage]);
+      setActiveGame(gameMessage);
+      
+      // Send via socket to other user
+      if (socketRef.current) {
+        socketRef.current.emit('game:start', {
+          toUserId: chatId,
+          gameType: response.type,
+          question: response.question
+        });
+      }
+      
+      // Scroll to bottom
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    } catch (error) {
+      console.error('Error starting game:', error);
+      alert('Failed to start game');
+    }
+  };
+
+  // Handle game response (accept/skip)
+  const handleGameResponse = async (gameId, response) => {
+    const game = chatMessages.find(m => m.id === gameId);
+    if (!game || game.sender !== 'system') return;
+
+    if (response === 'skip') {
+      const newSkipsUsed = (game.skipsUsed || 0) + 1;
+      const newSkipsRemaining = (game.skipsRemaining || 2) - 1;
+      
+      if (newSkipsRemaining < 0) {
+        alert('You have used all your skips for this round!');
+        return;
+      }
+
+      // Update game state
+      setChatMessages(prev => prev.map(msg => 
+        msg.id === gameId 
+          ? { ...msg, skipsUsed: newSkipsUsed, skipsRemaining: newSkipsRemaining }
+          : msg
+      ));
+
+      // Get new question
+      try {
+        const newResponse = await apiGet(`/api/game/${game.gameType}`);
+        setChatMessages(prev => prev.map(msg => 
+          msg.id === gameId 
+            ? { ...msg, question: newResponse.question }
+            : msg
+        ));
+      } catch (error) {
+        console.error('Error getting new question:', error);
+      }
+    } else if (response === 'accept') {
+      // Mark as accepted
+      setChatMessages(prev => prev.map(msg => 
+        msg.id === gameId 
+          ? { ...msg, gameState: 'accepted' }
+          : msg
+      ));
+    }
+
+    // Notify other user
+    if (socketRef.current) {
+      socketRef.current.emit('game:response', {
+        toUserId: chatId,
+        gameId,
+        response
+      });
+    }
+  };
+
+  // Handle incoming game
+  useEffect(() => {
+    if (me && socketRef.current) {
+      const handleGameStart = ({ fromUserId, gameType, question }) => {
+        if (fromUserId === chatId) {
+          const gameMessage = {
+            id: `game-${Date.now()}`,
+            type: 'game',
+            gameType: gameType,
+            question: question,
+            sender: 'system',
+            timestamp: new Date().toISOString(),
+            optimistic: false,
+            gameState: 'pending',
+            skipsUsed: 0,
+            skipsRemaining: 2
+          };
+          setChatMessages(prev => [...prev, gameMessage]);
+          setActiveGame(gameMessage);
+          
+          setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+          }, 100);
+        }
+      };
+
+      socketRef.current.on('game:start', handleGameStart);
+      return () => {
+        socketRef.current?.off('game:start', handleGameStart);
+      };
+    }
+  }, [me, chatId]);
+
   if (!me) {
     return (
       <div className="chats-page">
@@ -1071,7 +1199,10 @@ export default function Chats() {
             <button 
               type="button" 
               className="back-btn" 
-              onClick={() => setShowVideoCall(true)}
+              onClick={() => {
+                setShowVideoCall(true);
+                setIncomingCallData(null);
+              }}
               title="Video Call"
             >
               📹
@@ -1079,7 +1210,7 @@ export default function Chats() {
             <button 
               type="button" 
               className="back-btn" 
-              onClick={() => setShowGame(true)}
+              onClick={startTruthDareGame}
               title="Truth or Dare"
             >
               🎮
@@ -1108,67 +1239,70 @@ export default function Chats() {
           {chatMessages.map((msg) => {
             const replyToMessage = msg.replyToMessage || (msg.replyTo ? findReplyToMessage(msg.replyTo) : null);
             const isOptimistic = msg.optimistic;
+            const isSystemMessage = msg.sender === 'system';
             
             return (
               <div
                 key={msg.id}
-                className={`message ${msg.sender === 'me' ? 'sent' : 'received'} ${isOptimistic ? 'optimistic' : ''}`}
-                onTouchStart={(e) => handleTouchStart(e, msg.id, msg.sender)}
-                onTouchMove={(e) => handleTouchMove(e, msg.id)}
-                onTouchEnd={(e) => handleTouchEnd(e, msg.id)}
-                onMouseEnter={() => setHoveredMessageId(msg.id)}
-                onMouseLeave={() => setHoveredMessageId(null)}
-                style={{
+                className={`message ${isSystemMessage ? 'system' : (msg.sender === 'me' ? 'sent' : 'received')} ${isOptimistic ? 'optimistic' : ''}`}
+                onTouchStart={!isSystemMessage ? (e) => handleTouchStart(e, msg.id, msg.sender) : undefined}
+                onTouchMove={!isSystemMessage ? (e) => handleTouchMove(e, msg.id) : undefined}
+                onTouchEnd={!isSystemMessage ? (e) => handleTouchEnd(e, msg.id) : undefined}
+                onMouseEnter={!isSystemMessage ? () => setHoveredMessageId(msg.id) : undefined}
+                onMouseLeave={!isSystemMessage ? () => setHoveredMessageId(null) : undefined}
+                style={!isSystemMessage ? {
                   transform: swipeData[msg.id]?.offset > 0 
                     ? (msg.sender === 'other' 
                         ? `translateX(${swipeData[msg.id].offset}px)` 
                         : `translateX(-${swipeData[msg.id].offset}px)`)
                     : 'translateX(0)',
                   transition: !swipeData[msg.id] ? 'transform 0.2s ease-out' : 'none'
-                }}
+                } : {}}
               >
-                <div 
-                  className="message-menu-wrapper"
-                  onMouseEnter={() => setHoveredMessageId(msg.id)}
-                  onMouseLeave={(e) => {
-                    // Only hide if mouse is not moving to the button
-                    const relatedTarget = e.relatedTarget;
-                    if (!relatedTarget || !relatedTarget.closest('.message-menu-wrapper')) {
-                      setHoveredMessageId(null);
-                    }
-                  }}
-                >
-                  {hoveredMessageId === msg.id && (
-                    <div className="message-menu">
-                      <button
-                        type="button"
-                        className="message-menu-btn"
-                        onClick={() => {
-                          handleReply(msg);
-                          setHoveredMessageId(null);
-                        }}
-                        onMouseEnter={() => setHoveredMessageId(msg.id)}
-                        aria-label="Reply"
-                      >
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                          <path d="M8 0L3 5h3v3h4V5h3L8 0zM0 9v7h16V9h-2v5H2V9H0z" fill="currentColor"/>
-                        </svg>
-                      </button>
-                      <button
-                        type="button"
-                        className="message-menu-btn"
-                        onClick={() => {
-                          setShowReactionPicker(showReactionPicker === msg.id ? null : msg.id);
-                          setHoveredMessageId(null);
-                        }}
-                        onMouseEnter={() => setHoveredMessageId(msg.id)}
-                        aria-label="React"
-                      >
-                        😊
-                      </button>
-                    </div>
-                  )}
-                </div>
+                {!isSystemMessage && (
+                  <div 
+                    className="message-menu-wrapper"
+                    onMouseEnter={() => setHoveredMessageId(msg.id)}
+                    onMouseLeave={(e) => {
+                      // Only hide if mouse is not moving to the button
+                      const relatedTarget = e.relatedTarget;
+                      if (!relatedTarget || !relatedTarget.closest('.message-menu-wrapper')) {
+                        setHoveredMessageId(null);
+                      }
+                    }}
+                  >
+                    {hoveredMessageId === msg.id && (
+                      <div className="message-menu">
+                        <button
+                          type="button"
+                          className="message-menu-btn"
+                          onClick={() => {
+                            handleReply(msg);
+                            setHoveredMessageId(null);
+                          }}
+                          onMouseEnter={() => setHoveredMessageId(msg.id)}
+                          aria-label="Reply"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <path d="M8 0L3 5h3v3h4V5h3L8 0zM0 9v7h16V9h-2v5H2V9H0z" fill="currentColor"/>
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          className="message-menu-btn"
+                          onClick={() => {
+                            setShowReactionPicker(showReactionPicker === msg.id ? null : msg.id);
+                            setHoveredMessageId(null);
+                          }}
+                          onMouseEnter={() => setHoveredMessageId(msg.id)}
+                          aria-label="React"
+                        >
+                          😊
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {replyToMessage && (
                   <div className="message-reply-preview">
                     <div className="reply-preview-line" />
@@ -1191,6 +1325,47 @@ export default function Chats() {
                   </div>
                 )}
                 {msg.type === 'text' && <p>{msg.text}</p>}
+                {msg.type === 'game' && (
+                  <div className="game-message">
+                    <div className={`game-type-badge ${msg.gameType}`}>
+                      {msg.gameType === 'truth' ? 'Truth' : 'Dare'}
+                    </div>
+                    <p style={{ marginTop: '0.5rem', marginBottom: '0.5rem', fontSize: '1rem' }}>{msg.question}</p>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+                      Rules: You can skip up to 2 times per round
+                    </div>
+                    {msg.gameState !== 'accepted' && (
+                      <div className="game-actions" style={{ marginTop: '0.5rem' }}>
+                        <button
+                          type="button"
+                          className="game-btn accept"
+                          onClick={() => handleGameResponse(msg.id, 'accept')}
+                          style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                        >
+                          Accept
+                        </button>
+                        <button
+                          type="button"
+                          className="game-btn skip"
+                          onClick={() => handleGameResponse(msg.id, 'skip')}
+                          disabled={(msg.skipsRemaining || 2) <= 0}
+                          style={{ 
+                            padding: '0.5rem 1rem', 
+                            fontSize: '0.875rem',
+                            opacity: (msg.skipsRemaining || 2) <= 0 ? 0.5 : 1
+                          }}
+                        >
+                          Skip ({(msg.skipsRemaining || 2)} left)
+                        </button>
+                      </div>
+                    )}
+                    {msg.gameState === 'accepted' && (
+                      <div style={{ fontSize: '0.875rem', color: 'var(--success)', marginTop: '0.5rem', fontWeight: '600' }}>
+                        ✓ Accepted
+                      </div>
+                    )}
+                  </div>
+                )}
                 {msg.type === 'image' && (
                   <div className="image-message">
                     <img src={msg.imageUrl} alt="Shared image" />
@@ -1203,11 +1378,12 @@ export default function Chats() {
                     </video>
                   </div>
                 )}
-                <div className="message-time-container">
-                  <span className="message-time">
-                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                  {msg.sender === 'me' && (
+                {!isSystemMessage && (
+                  <div className="message-time-container">
+                    <span className="message-time">
+                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    {msg.sender === 'me' && (
                     <span className="message-status">
                       {msg.optimistic ? (
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="status-icon status-clock">
@@ -1230,10 +1406,11 @@ export default function Chats() {
                         </svg>
                       )}
                     </span>
-                  )}
-                </div>
-                {/* Message reactions */}
-                {msg.reactions && msg.reactions.length > 0 && (
+                    )}
+                  </div>
+                )}
+                {/* Message reactions - only for non-system messages */}
+                {!isSystemMessage && msg.reactions && msg.reactions.length > 0 && (
                   <div className="message-reactions">
                     {['👍', '❤️', '😂', '😮', '😢', '🔥'].map(emoji => {
                       const count = getReactionCount(msg.reactions, emoji);
@@ -1262,7 +1439,7 @@ export default function Chats() {
                     </button>
                   </div>
                 )}
-                {showReactionPicker === msg.id && (
+                {!isSystemMessage && showReactionPicker === msg.id && (
                   <div className="reaction-picker">
                     {['👍', '❤️', '😂', '😮', '😢', '🔥', '👏', '🎉'].map(emoji => (
                       <button
@@ -1413,19 +1590,16 @@ export default function Chats() {
         {/* Video Call Component */}
         {showVideoCall && (
           <VideoCall
-            chatId={chatId}
-            otherUserId={chatId}
-            onEnd={() => setShowVideoCall(false)}
-            isIncoming={false}
-          />
-        )}
-        {/* Truth/Dare Game Component */}
-        {showGame && (
-          <TruthDareGame
-            chatId={chatId}
-            otherUserId={chatId}
-            otherUserName={chat?.name}
-            onClose={() => setShowGame(false)}
+            chatId={chatId || incomingCallData?.chatId}
+            otherUserId={incomingCallData?.fromUserId || chatId}
+            onEnd={() => {
+              setShowVideoCall(false);
+              setIncomingCallData(null);
+            }}
+            isIncoming={!!incomingCallData}
+            callerName={incomingCallData?.fromUserName || chat?.name}
+            onAccept={() => setIncomingCallData(null)}
+            onReject={() => setIncomingCallData(null)}
           />
         )}
       </div>

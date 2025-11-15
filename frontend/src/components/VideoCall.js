@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { getSocket } from '../lib/socket';
 
-export default function VideoCall({ chatId, otherUserId, onEnd, isIncoming, callerName }) {
+export default function VideoCall({ chatId, otherUserId, onEnd, isIncoming, callerName, onAccept, onReject }) {
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
+  const [callAccepted, setCallAccepted] = useState(!isIncoming);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const localStreamRef = useRef(null);
@@ -36,19 +37,17 @@ export default function VideoCall({ chatId, otherUserId, onEnd, isIncoming, call
           });
         }
 
-        // Handle incoming call
-        socket.on('call:offer', ({ fromUserId, offer }) => {
-          if (fromUserId === otherUserId) {
-            // Accept call automatically or show accept/reject UI
+        // Handle call answer
+        socket.on('call:answer', ({ fromUserId, answer }) => {
+          if (fromUserId === otherUserId && answer === 'accepted') {
+            setCallAccepted(true);
           }
         });
 
-        socket.on('call:answer', ({ answer }) => {
-          // Handle answer
-        });
-
-        socket.on('call:end', () => {
-          endCall();
+        socket.on('call:end', ({ fromUserId }) => {
+          if (fromUserId === otherUserId || !fromUserId) {
+            endCall();
+          }
         });
       } catch (error) {
         console.error('Error starting call:', error);
@@ -57,12 +56,16 @@ export default function VideoCall({ chatId, otherUserId, onEnd, isIncoming, call
       }
     };
 
-    startCall();
+    if (callAccepted || !isIncoming) {
+      startCall();
+    }
 
     return () => {
-      endCall();
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach(track => track.stop());
+      }
     };
-  }, [chatId, otherUserId, isIncoming]);
+  }, [chatId, otherUserId, isIncoming, callAccepted]);
 
   const endCall = () => {
     if (localStreamRef.current) {
@@ -71,6 +74,29 @@ export default function VideoCall({ chatId, otherUserId, onEnd, isIncoming, call
     if (socketRef.current) {
       socketRef.current.emit('call:end', { toUserId: otherUserId });
     }
+    onEnd();
+  };
+
+  const acceptCall = () => {
+    if (socketRef.current) {
+      socketRef.current.emit('call:answer', {
+        toUserId: otherUserId,
+        answer: 'accepted'
+      });
+    }
+    setCallAccepted(true);
+    if (onAccept) onAccept();
+  };
+
+  const rejectCall = () => {
+    if (socketRef.current) {
+      socketRef.current.emit('call:answer', {
+        toUserId: otherUserId,
+        answer: 'rejected'
+      });
+      socketRef.current.emit('call:end', { toUserId: otherUserId });
+    }
+    if (onReject) onReject();
     onEnd();
   };
 
@@ -92,10 +118,33 @@ export default function VideoCall({ chatId, otherUserId, onEnd, isIncoming, call
     }
   };
 
+  // Show accept/reject UI for incoming calls
+  if (isIncoming && !callAccepted) {
+    return (
+      <div className="video-call-container">
+        <div className="video-call-header">
+          <h3>Incoming call from {callerName}</h3>
+        </div>
+        <div className="video-call-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '2rem' }}>
+          <div style={{ fontSize: '4rem' }}>📹</div>
+          <h2>{callerName} is calling...</h2>
+        </div>
+        <div className="video-call-controls">
+          <button onClick={rejectCall} className="video-call-btn end-call" style={{ background: 'var(--error)' }}>
+            ✕
+          </button>
+          <button onClick={acceptCall} className="video-call-btn" style={{ background: 'var(--success)', color: 'white', fontSize: '1.5rem' }}>
+            ✓
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="video-call-container">
       <div className="video-call-header">
-        <h3>{isIncoming ? `Incoming call from ${callerName}` : 'Video Call'}</h3>
+        <h3>Video Call {callerName ? `with ${callerName}` : ''}</h3>
         <button onClick={endCall} className="video-call-btn end-call">✕</button>
       </div>
       <div className="video-call-content">

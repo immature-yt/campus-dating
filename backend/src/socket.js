@@ -6,6 +6,8 @@ import { User } from './models/User.js';
 // Store typing indicators: { userId: { typingIn: chatId, timestamp } }
 const typingUsers = new Map();
 
+let ioInstance = null;
+
 export function initializeSocket(server) {
   const io = new Server(server, {
     cors: {
@@ -14,6 +16,8 @@ export function initializeSocket(server) {
       credentials: false
     }
   });
+
+  ioInstance = io; // Store for use in getIo()
 
   // Authentication middleware for socket
   io.use(async (socket, next) => {
@@ -78,37 +82,43 @@ export function initializeSocket(server) {
 
     // Video call signaling
     socket.on('call:offer', ({ toUserId, offer, chatId }) => {
-      // Emit to both user room and chat room to ensure delivery
-      socket.to(`user:${toUserId}`).emit('call:offer', {
+      console.log(`Call offer from ${socket.userId} to ${toUserId} in chat ${chatId}`);
+      
+      // Emit to user's personal room (always available)
+      io.to(`user:${toUserId}`).emit('call:offer', {
         fromUserId: socket.userId,
         fromUserName: socket.user.name,
         offer,
         chatId
       });
-      socket.to(`chat:${chatId}`).emit('call:offer', {
-        fromUserId: socket.userId,
-        fromUserName: socket.user.name,
-        offer,
-        chatId
-      });
+      
+      // Also emit to chat room if it exists (backup)
+      if (chatId) {
+        io.to(`chat:${chatId}`).emit('call:offer', {
+          fromUserId: socket.userId,
+          fromUserName: socket.user.name,
+          offer,
+          chatId
+        });
+      }
     });
 
     socket.on('call:answer', ({ toUserId, answer }) => {
-      socket.to(`user:${toUserId}`).emit('call:answer', {
+      io.to(`user:${toUserId}`).emit('call:answer', {
         fromUserId: socket.userId,
         answer
       });
     });
 
     socket.on('call:ice-candidate', ({ toUserId, candidate }) => {
-      socket.to(`user:${toUserId}`).emit('call:ice-candidate', {
+      io.to(`user:${toUserId}`).emit('call:ice-candidate', {
         fromUserId: socket.userId,
         candidate
       });
     });
 
     socket.on('call:end', ({ toUserId }) => {
-      socket.to(`user:${toUserId}`).emit('call:end', {
+      io.to(`user:${toUserId}`).emit('call:end', {
         fromUserId: socket.userId
       });
     });
@@ -151,5 +161,12 @@ export function initializeSocket(server) {
   });
 
   return io;
+}
+
+export function getIo() {
+  if (!ioInstance) {
+    throw new Error('Socket.IO not initialized! Call initializeSocket first.');
+  }
+  return ioInstance;
 }
 

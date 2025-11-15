@@ -175,16 +175,36 @@ export default function Chats() {
     }
   }, [me]);
 
-  // Setup socket connection
+  // Setup global socket listeners (not dependent on chatId)
   useEffect(() => {
     if (me) {
       const socket = getSocket();
       socketRef.current = socket;
 
+      // Handle incoming video call - listen globally for all calls
+      const handleIncomingCall = ({ fromUserId, fromUserName, offer, chatId: callChatId }) => {
+        console.log('Incoming call received:', { fromUserId, fromUserName, callChatId, myId: me._id });
+        // Show call notification - always show if it's for us (fromUserId should be the other person)
+        setShowVideoCall(true);
+        setIncomingCallData({ fromUserId, fromUserName, chatId: callChatId });
+      };
+
+      socket.on('call:offer', handleIncomingCall);
+
+      return () => {
+        socket.off('call:offer', handleIncomingCall);
+      };
+    }
+  }, [me]); // Only depend on me, not chatId
+
+  // Setup chat-specific socket listeners
+  useEffect(() => {
+    if (me && chatId) {
+      const socket = getSocket();
+      socketRef.current = socket;
+
       // Join chat room when chatId is available
-      if (chatId) {
-        socket.emit('chat:join', { chatId });
-      }
+      socket.emit('chat:join', { chatId });
 
       // Handle typing indicators
       socket.on('typing:start', ({ userId, userName }) => {
@@ -199,18 +219,6 @@ export default function Chats() {
         }
       });
 
-      // Handle incoming video call - listen globally
-      const handleIncomingCall = ({ fromUserId, fromUserName, offer, chatId: callChatId }) => {
-        // Show call notification if it's for current chat or if we're not in a chat
-        if (!chatId || callChatId === chatId || fromUserId === chatId) {
-          // Show incoming call UI with accept/reject options
-          setShowVideoCall(true);
-          setIncomingCallData({ fromUserId, fromUserName, chatId: callChatId || chatId });
-        }
-      };
-
-      socket.on('call:offer', handleIncomingCall);
-
       // Handle game start
       socket.on('game:start', ({ fromUserId, gameType }) => {
         if (fromUserId === chatId) {
@@ -219,12 +227,9 @@ export default function Chats() {
       });
 
       return () => {
-        if (chatId) {
-          socket.emit('chat:leave', { chatId });
-        }
+        socket.emit('chat:leave', { chatId });
         socket.off('typing:start');
         socket.off('typing:stop');
-        socket.off('call:offer', handleIncomingCall);
         socket.off('game:start');
       };
     }

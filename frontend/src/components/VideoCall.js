@@ -30,6 +30,7 @@ export default function VideoCall({ chatId, otherUserId, onEnd, isIncoming, call
         // Create peer connection (simplified - in production use proper WebRTC)
         if (!isIncoming) {
           // Initiate call
+          console.log('Sending call offer:', { toUserId: otherUserId, chatId });
           socket.emit('call:offer', {
             toUserId: otherUserId,
             offer: 'initiate',

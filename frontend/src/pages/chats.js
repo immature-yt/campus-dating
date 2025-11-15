@@ -135,6 +135,8 @@ export default function Chats() {
   const [replyingTo, setReplyingTo] = useState(null);
   const [swipeData, setSwipeData] = useState({});
   const [hoveredMessageId, setHoveredMessageId] = useState(null);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [messagesError, setMessagesError] = useState(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const streamRef = useRef(null);
@@ -166,11 +168,15 @@ export default function Chats() {
   useEffect(() => {
     if (chatId && me) {
       loadChatMessages(chatId);
-      // Set up auto-refresh every 3 seconds
+      // Set up auto-refresh every 3 seconds (only refresh, don't show loading state)
       const interval = setInterval(() => {
-        loadChatMessages(chatId);
+        loadChatMessages(chatId, true, false); // Preserve optimistic messages during refresh, don't show loading
       }, 3000);
       return () => clearInterval(interval);
+    } else {
+      // Clear messages when leaving a chat
+      setChatMessages([]);
+      setMessagesError(null);
     }
   }, [chatId, me]);
 
@@ -202,9 +208,14 @@ export default function Chats() {
     }
   };
 
-  const loadChatMessages = async (userId, preserveOptimistic = false) => {
+  const loadChatMessages = async (userId, preserveOptimistic = false, showLoading = true) => {
     try {
       if (!userId || !me) return;
+      
+      if (showLoading) {
+        setIsLoadingMessages(true);
+        setMessagesError(null);
+      }
       
       const response = await apiGet(`/api/messages/${userId}`);
       const messages = response.messages || [];
@@ -264,8 +275,16 @@ export default function Chats() {
       } else {
         setChatMessages(formattedMessages);
       }
+      
+      if (showLoading) {
+        setIsLoadingMessages(false);
+      }
     } catch (error) {
       console.error('Error loading messages:', error);
+      if (showLoading) {
+        setMessagesError('Failed to load messages. Please try again.');
+        setIsLoadingMessages(false);
+      }
       // Don't set empty array on error, keep existing messages
     }
   };
@@ -505,16 +524,72 @@ export default function Chats() {
     }, 100);
     
     try {
-      await apiPost('/api/messages/send', {
+      const response = await apiPost('/api/messages/send', {
         toUserId: chatId,
         content: messageText,
         messageType: 'text',
         replyTo: replyToId
       });
       
-      // Remove optimistic message and reload
-      setChatMessages(prev => prev.filter(m => m.id !== tempId));
-      await loadChatMessages(chatId, true);
+      // Convert the sent message to the same format as other messages
+      if (response.message) {
+        const msg = response.message;
+        const fromUserId = typeof msg.fromUser === 'object' ? msg.fromUser._id : msg.fromUser;
+        const fromUserIdStr = fromUserId?.toString();
+        const myIdStr = me._id?.toString();
+        const isFromMe = fromUserIdStr === myIdStr;
+        
+        let replyToMessage = null;
+        if (msg.replyTo) {
+          const replyToMsg = typeof msg.replyTo === 'object' ? msg.replyTo : null;
+          if (replyToMsg) {
+            const replyFromUserId = typeof replyToMsg.fromUser === 'object' ? replyToMsg.fromUser._id : replyToMsg.fromUser;
+            const replyFromUserIdStr = replyFromUserId?.toString();
+            const isReplyFromMe = replyFromUserIdStr === myIdStr;
+            
+            replyToMessage = {
+              id: replyToMsg._id,
+              type: replyToMsg.messageType || 'text',
+              text: replyToMsg.content,
+              audioUrl: replyToMsg.messageType === 'voice' ? replyToMsg.mediaUrl : null,
+              imageUrl: replyToMsg.messageType === 'image' ? replyToMsg.mediaUrl : null,
+              videoUrl: replyToMsg.messageType === 'video' ? replyToMsg.mediaUrl : null,
+              sender: isReplyFromMe ? 'me' : 'other'
+            };
+          }
+        }
+        
+        const realMessage = {
+          id: msg._id,
+          type: msg.messageType || 'text',
+          text: msg.content,
+          audioUrl: msg.messageType === 'voice' ? msg.mediaUrl : null,
+          imageUrl: msg.messageType === 'image' ? msg.mediaUrl : null,
+          videoUrl: msg.messageType === 'video' ? msg.mediaUrl : null,
+          timestamp: msg.createdAt,
+          sender: isFromMe ? 'me' : 'other',
+          replyTo: msg.replyTo ? (typeof msg.replyTo === 'object' ? msg.replyTo._id : msg.replyTo) : null,
+          replyToMessage: replyToMessage,
+          isDelivered: msg.isDelivered || false,
+          isRead: msg.isRead || false,
+          optimistic: false
+        };
+        
+        // Replace optimistic message with real message
+        setChatMessages(prev => {
+          const filtered = prev.filter(m => m.id !== tempId);
+          return [...filtered, realMessage].sort((a, b) => 
+            new Date(a.timestamp || 0) - new Date(b.timestamp || 0)
+          );
+        });
+      } else {
+        // Fallback: reload messages after a short delay to ensure the message is saved
+        setTimeout(async () => {
+          setChatMessages(prev => prev.filter(m => m.id !== tempId));
+          await loadChatMessages(chatId, false);
+        }, 300);
+      }
+      
       // Reload conversations to update preview
       await loadConversations();
     } catch (error) {
@@ -559,15 +634,72 @@ export default function Chats() {
     const reader = new FileReader();
     reader.onloadend = async () => {
       try {
-        await apiPost('/api/messages/send', {
+        const response = await apiPost('/api/messages/send', {
           toUserId: chatId,
           content: 'Image',
           messageType: 'image',
           mediaUrl: reader.result,
           replyTo: optimisticMessage.replyTo
         });
-        setChatMessages(prev => prev.filter(m => m.id !== tempId));
-        await loadChatMessages(chatId, true);
+        
+        // Convert the sent message to the same format
+        if (response.message) {
+          const msg = response.message;
+          const fromUserId = typeof msg.fromUser === 'object' ? msg.fromUser._id : msg.fromUser;
+          const fromUserIdStr = fromUserId?.toString();
+          const myIdStr = me._id?.toString();
+          const isFromMe = fromUserIdStr === myIdStr;
+          
+          let replyToMessage = null;
+          if (msg.replyTo) {
+            const replyToMsg = typeof msg.replyTo === 'object' ? msg.replyTo : null;
+            if (replyToMsg) {
+              const replyFromUserId = typeof replyToMsg.fromUser === 'object' ? replyToMsg.fromUser._id : replyToMsg.fromUser;
+              const replyFromUserIdStr = replyFromUserId?.toString();
+              const isReplyFromMe = replyFromUserIdStr === myIdStr;
+              
+              replyToMessage = {
+                id: replyToMsg._id,
+                type: replyToMsg.messageType || 'text',
+                text: replyToMsg.content,
+                audioUrl: replyToMsg.messageType === 'voice' ? replyToMsg.mediaUrl : null,
+                imageUrl: replyToMsg.messageType === 'image' ? replyToMsg.mediaUrl : null,
+                videoUrl: replyToMsg.messageType === 'video' ? replyToMsg.mediaUrl : null,
+                sender: isReplyFromMe ? 'me' : 'other'
+              };
+            }
+          }
+          
+          const realMessage = {
+            id: msg._id,
+            type: msg.messageType || 'image',
+            text: msg.content,
+            audioUrl: msg.messageType === 'voice' ? msg.mediaUrl : null,
+            imageUrl: msg.messageType === 'image' ? msg.mediaUrl : null,
+            videoUrl: msg.messageType === 'video' ? msg.mediaUrl : null,
+            timestamp: msg.createdAt,
+            sender: isFromMe ? 'me' : 'other',
+            replyTo: msg.replyTo ? (typeof msg.replyTo === 'object' ? msg.replyTo._id : msg.replyTo) : null,
+            replyToMessage: replyToMessage,
+            isDelivered: msg.isDelivered || false,
+            isRead: msg.isRead || false,
+            optimistic: false
+          };
+          
+          // Replace optimistic message with real message
+          setChatMessages(prev => {
+            const filtered = prev.filter(m => m.id !== tempId);
+            return [...filtered, realMessage].sort((a, b) => 
+              new Date(a.timestamp || 0) - new Date(b.timestamp || 0)
+            );
+          });
+        } else {
+          // Fallback: reload messages after a short delay
+          setTimeout(async () => {
+            setChatMessages(prev => prev.filter(m => m.id !== tempId));
+            await loadChatMessages(chatId, false);
+          }, 300);
+        }
       } catch (error) {
         console.error('Error sending image:', error);
         setChatMessages(prev => prev.filter(m => m.id !== tempId));
@@ -611,15 +743,72 @@ export default function Chats() {
     const reader = new FileReader();
     reader.onloadend = async () => {
       try {
-        await apiPost('/api/messages/send', {
+        const response = await apiPost('/api/messages/send', {
           toUserId: chatId,
           content: 'Video',
           messageType: 'video',
           mediaUrl: reader.result,
           replyTo: optimisticMessage.replyTo
         });
-        setChatMessages(prev => prev.filter(m => m.id !== tempId));
-        await loadChatMessages(chatId, true);
+        
+        // Convert the sent message to the same format
+        if (response.message) {
+          const msg = response.message;
+          const fromUserId = typeof msg.fromUser === 'object' ? msg.fromUser._id : msg.fromUser;
+          const fromUserIdStr = fromUserId?.toString();
+          const myIdStr = me._id?.toString();
+          const isFromMe = fromUserIdStr === myIdStr;
+          
+          let replyToMessage = null;
+          if (msg.replyTo) {
+            const replyToMsg = typeof msg.replyTo === 'object' ? msg.replyTo : null;
+            if (replyToMsg) {
+              const replyFromUserId = typeof replyToMsg.fromUser === 'object' ? replyToMsg.fromUser._id : replyToMsg.fromUser;
+              const replyFromUserIdStr = replyFromUserId?.toString();
+              const isReplyFromMe = replyFromUserIdStr === myIdStr;
+              
+              replyToMessage = {
+                id: replyToMsg._id,
+                type: replyToMsg.messageType || 'text',
+                text: replyToMsg.content,
+                audioUrl: replyToMsg.messageType === 'voice' ? replyToMsg.mediaUrl : null,
+                imageUrl: replyToMsg.messageType === 'image' ? replyToMsg.mediaUrl : null,
+                videoUrl: replyToMsg.messageType === 'video' ? replyToMsg.mediaUrl : null,
+                sender: isReplyFromMe ? 'me' : 'other'
+              };
+            }
+          }
+          
+          const realMessage = {
+            id: msg._id,
+            type: msg.messageType || 'video',
+            text: msg.content,
+            audioUrl: msg.messageType === 'voice' ? msg.mediaUrl : null,
+            imageUrl: msg.messageType === 'image' ? msg.mediaUrl : null,
+            videoUrl: msg.messageType === 'video' ? msg.mediaUrl : null,
+            timestamp: msg.createdAt,
+            sender: isFromMe ? 'me' : 'other',
+            replyTo: msg.replyTo ? (typeof msg.replyTo === 'object' ? msg.replyTo._id : msg.replyTo) : null,
+            replyToMessage: replyToMessage,
+            isDelivered: msg.isDelivered || false,
+            isRead: msg.isRead || false,
+            optimistic: false
+          };
+          
+          // Replace optimistic message with real message
+          setChatMessages(prev => {
+            const filtered = prev.filter(m => m.id !== tempId);
+            return [...filtered, realMessage].sort((a, b) => 
+              new Date(a.timestamp || 0) - new Date(b.timestamp || 0)
+            );
+          });
+        } else {
+          // Fallback: reload messages after a short delay
+          setTimeout(async () => {
+            setChatMessages(prev => prev.filter(m => m.id !== tempId));
+            await loadChatMessages(chatId, false);
+          }, 300);
+        }
       } catch (error) {
         console.error('Error sending video:', error);
         setChatMessages(prev => prev.filter(m => m.id !== tempId));
@@ -741,6 +930,24 @@ export default function Chats() {
           <h2>{chat?.name || 'Chat'}</h2>
         </div>
         <div className="chat-messages">
+          {isLoadingMessages && chatMessages.length === 0 && (
+            <div className="loading-container" style={{ padding: '2rem', textAlign: 'center' }}>
+              <div className="loading-spinner" />
+              <p>Loading messages...</p>
+            </div>
+          )}
+          {messagesError && chatMessages.length === 0 && (
+            <div className="error-container" style={{ padding: '2rem', textAlign: 'center', color: 'var(--error)' }}>
+              <p>{messagesError}</p>
+              <button 
+                type="button"
+                onClick={() => loadChatMessages(chatId)}
+                style={{ marginTop: '1rem', padding: '0.5rem 1rem', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 'var(--radius)', cursor: 'pointer' }}
+              >
+                Retry
+              </button>
+            </div>
+          )}
           {chatMessages.map((msg) => {
             const replyToMessage = msg.replyToMessage || (msg.replyTo ? findReplyToMessage(msg.replyTo) : null);
             const isOptimistic = msg.optimistic;

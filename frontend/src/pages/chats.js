@@ -185,7 +185,16 @@ export default function Chats() {
         time: conv.lastMessage?.createdAt ? new Date(conv.lastMessage.createdAt).toLocaleTimeString() : 'now',
         photos: conv.photos
       }));
-      setMessages(formattedConversations);
+      
+      // Deduplicate by id as a safety measure (in case backend still returns duplicates)
+      const uniqueConversations = formattedConversations.reduce((acc, conv) => {
+        if (!acc.find(c => c.id === conv.id)) {
+          acc.push(conv);
+        }
+        return acc;
+      }, []);
+      
+      setMessages(uniqueConversations);
     } catch (error) {
       console.error('Error loading conversations:', error);
       // Fallback to empty array
@@ -958,6 +967,11 @@ export default function Chats() {
         </div>
       </div>
     );
+  }
+
+  // Only render the list if we're not viewing a specific chat
+  if (chatId) {
+    return null; // This shouldn't happen due to early return above, but just in case
   }
 
   return (

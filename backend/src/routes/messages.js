@@ -41,7 +41,7 @@ router.get('/conversations', requireAuth, async (req, res) => {
         }).sort({ createdAt: -1 });
 
         return {
-          userId: otherUserId,
+          userId: otherUserId.toString(),
           name: otherUser.name,
           email: otherUser.email,
           photos: otherUser.photos,
@@ -57,7 +57,25 @@ router.get('/conversations', requireAuth, async (req, res) => {
       })
     );
 
-    return res.json({ conversations });
+    // Deduplicate conversations by userId (keep the one with the most recent lastMessage or matchedAt)
+    const conversationMap = new Map();
+    conversations.forEach(conv => {
+      const existing = conversationMap.get(conv.userId);
+      if (!existing) {
+        conversationMap.set(conv.userId, conv);
+      } else {
+        // Keep the conversation with the most recent activity
+        const existingTime = existing.lastMessage?.createdAt || existing.matchedAt;
+        const currentTime = conv.lastMessage?.createdAt || conv.matchedAt;
+        if (new Date(currentTime) > new Date(existingTime)) {
+          conversationMap.set(conv.userId, conv);
+        }
+      }
+    });
+
+    const uniqueConversations = Array.from(conversationMap.values());
+
+    return res.json({ conversations: uniqueConversations });
   } catch (error) {
     console.error('Error fetching conversations:', error);
     return res.status(500).json({ error: 'Failed to fetch conversations' });

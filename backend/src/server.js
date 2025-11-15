@@ -80,6 +80,11 @@ async function bootstrap() {
       // Allow requests with no origin (mobile apps, curl, Postman)
       if (!origin) return callback(null, true);
       
+      // Allow Capacitor app origins (mobile apps)
+      if (origin.startsWith('capacitor://') || origin.startsWith('http://localhost') || origin.startsWith('ionic://')) {
+        return callback(null, true);
+      }
+      
       // Normalize origin (remove trailing slash)
       const normalizedOrigin = origin.replace(/\/+$/, '');
       const normalizedFrontendUrl = (config.frontendUrl || '').replace(/\/+$/, '');

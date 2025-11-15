@@ -144,6 +144,7 @@ export default function Chats() {
   const messagesEndRef = useRef(null);
   const imageInputRef = useRef(null);
   const videoInputRef = useRef(null);
+  const lastMessageSentRef = useRef(null); // Track when we last sent a message to prevent auto-refresh interference
 
   useEffect(() => {
     apiGet('/api/auth/me')
@@ -168,15 +169,26 @@ export default function Chats() {
   useEffect(() => {
     if (chatId && me) {
       loadChatMessages(chatId);
+      // Reload conversations to clear unread count when opening a chat
+      loadConversations();
       // Set up auto-refresh every 3 seconds (only refresh, don't show loading state)
       const interval = setInterval(() => {
-        loadChatMessages(chatId, true, false); // Preserve optimistic messages during refresh, don't show loading
+        // Skip auto-refresh if we just sent a message (within last 2 seconds)
+        const timeSinceLastMessage = lastMessageSentRef.current 
+          ? Date.now() - lastMessageSentRef.current 
+          : Infinity;
+        if (timeSinceLastMessage > 2000) {
+          loadChatMessages(chatId, true, false); // Preserve optimistic messages during refresh, don't show loading
+          // Also refresh conversations to update unread counts
+          loadConversations();
+        }
       }, 3000);
       return () => clearInterval(interval);
     } else {
       // Clear messages when leaving a chat
       setChatMessages([]);
       setMessagesError(null);
+      lastMessageSentRef.current = null;
     }
   }, [chatId, me]);
 
@@ -189,7 +201,8 @@ export default function Chats() {
         name: conv.name,
         preview: conv.lastMessage?.content?.substring(0, 50) || 'Start the conversation!',
         time: conv.lastMessage?.createdAt ? new Date(conv.lastMessage.createdAt).toLocaleTimeString() : 'now',
-        photos: conv.photos
+        photos: conv.photos,
+        unreadCount: conv.unreadCount || 0
       }));
       
       // Deduplicate by id as a safety measure (in case backend still returns duplicates)
@@ -518,6 +531,7 @@ export default function Chats() {
     setChatMessages(prev => [...prev, optimisticMessage]);
     setInputText('');
     setReplyingTo(null);
+    lastMessageSentRef.current = Date.now(); // Track when we sent the message
     
     setTimeout(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -575,8 +589,15 @@ export default function Chats() {
           optimistic: false
         };
         
-        // Replace optimistic message with real message
+        // Replace optimistic message with real message - use functional update to avoid race conditions
         setChatMessages(prev => {
+          // Check if message already exists (from auto-refresh)
+          const existingIndex = prev.findIndex(m => m.id === msg._id);
+          if (existingIndex >= 0) {
+            // Message already exists, just remove optimistic
+            return prev.filter(m => m.id !== tempId);
+          }
+          // Message doesn't exist yet, replace optimistic with real
           const filtered = prev.filter(m => m.id !== tempId);
           return [...filtered, realMessage].sort((a, b) => 
             new Date(a.timestamp || 0) - new Date(b.timestamp || 0)
@@ -1205,7 +1226,26 @@ export default function Chats() {
                 <h3>{chat.name}</h3>
                 <p>{chat.preview}</p>
               </div>
-              <span className="chat-time">{chat.time}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.25rem' }}>
+                <span className="chat-time">{chat.time}</span>
+                {chat.unreadCount > 0 && (
+                  <span 
+                    className="unread-badge"
+                    style={{
+                      background: 'var(--primary)',
+                      color: 'white',
+                      borderRadius: '10px',
+                      padding: '0.125rem 0.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      minWidth: '20px',
+                      textAlign: 'center'
+                    }}
+                  >
+                    {chat.unreadCount > 4 ? '4+' : chat.unreadCount}
+                  </span>
+                )}
+              </div>
             </div>
           ))}
         </div>

@@ -21,41 +21,112 @@ router.get('/conversations', requireAuth, async (req, res) => {
       .populate('toUser', 'name email photos verification_status')
       .sort({ updatedAt: -1 });
 
-    // Get the other user for each match
-    const conversations = await Promise.all(
-      matches.map(async (match) => {
-        const otherUserId = match.fromUser._id.toString() === req.user._id.toString() 
-          ? match.toUser._id 
-          : match.fromUser._id;
-        
-        const otherUser = match.fromUser._id.toString() === req.user._id.toString() 
-          ? match.toUser 
-          : match.fromUser;
+    // Get all other user IDs
+    const otherUserIds = matches.map(match => {
+      return match.fromUser._id.toString() === req.user._id.toString() 
+        ? match.toUser._id.toString()
+        : match.fromUser._id.toString();
+    });
 
-        // Get last message
-        const lastMessage = await Message.findOne({
+    // Batch query: Get last message for each conversation in one query
+    const userObjectId = req.user._id;
+    const otherUserObjectIds = otherUserIds.map(id => new mongoose.Types.ObjectId(id));
+    
+    const lastMessages = await Message.aggregate([
+      {
+        $match: {
           $or: [
-            { fromUser: req.user._id, toUser: otherUserId },
-            { fromUser: otherUserId, toUser: req.user._id }
+            { fromUser: userObjectId, toUser: { $in: otherUserObjectIds } },
+            { toUser: userObjectId, fromUser: { $in: otherUserObjectIds } }
           ]
-        }).sort({ createdAt: -1 });
+        }
+      },
+      {
+        $addFields: {
+          otherUserId: {
+            $cond: [
+              { $eq: ['$fromUser', userObjectId] },
+              '$toUser',
+              '$fromUser'
+            ]
+          }
+        }
+      },
+      {
+        $sort: { createdAt: -1 }
+      },
+      {
+        $group: {
+          _id: '$otherUserId',
+          lastMessage: { $first: '$$ROOT' }
+        }
+      }
+    ]);
 
-        return {
-          userId: otherUserId.toString(),
-          name: otherUser.name,
-          email: otherUser.email,
-          photos: otherUser.photos,
-          verification_status: otherUser.verification_status,
-          lastMessage: lastMessage ? {
-            content: lastMessage.content,
-            messageType: lastMessage.messageType,
-            createdAt: lastMessage.createdAt,
-            isFromMe: lastMessage.fromUser.toString() === req.user._id.toString()
-          } : null,
-          matchedAt: match.updatedAt
-        };
-      })
-    );
+    // Batch query: Get unread message count for each conversation
+    const unreadCounts = await Message.aggregate([
+      {
+        $match: {
+          toUser: req.user._id,
+          isRead: false,
+          fromUser: { $in: otherUserIds.map(id => new mongoose.Types.ObjectId(id)) }
+        }
+      },
+      {
+        $group: {
+          _id: '$fromUser',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // Create a map for quick lookup
+    const lastMessageMap = new Map();
+    lastMessages.forEach(item => {
+      lastMessageMap.set(item._id.toString(), item.lastMessage);
+    });
+
+    const unreadCountMap = new Map();
+    unreadCounts.forEach(item => {
+      unreadCountMap.set(item._id.toString(), item.count);
+    });
+
+    // Build conversations array
+    const conversations = matches.map((match) => {
+      const otherUserId = match.fromUser._id.toString() === req.user._id.toString() 
+        ? match.toUser._id.toString()
+        : match.fromUser._id.toString();
+      
+      const otherUser = match.fromUser._id.toString() === req.user._id.toString() 
+        ? match.toUser 
+        : match.fromUser;
+
+      const lastMessageDoc = lastMessageMap.get(otherUserId);
+      const unreadCount = unreadCountMap.get(otherUserId) || 0;
+
+      // Check if last message is from current user
+      let isFromMe = false;
+      if (lastMessageDoc) {
+        const fromUserId = lastMessageDoc.fromUser?.toString() || lastMessageDoc.fromUser;
+        isFromMe = fromUserId === req.user._id.toString();
+      }
+
+      return {
+        userId: otherUserId,
+        name: otherUser.name,
+        email: otherUser.email,
+        photos: otherUser.photos,
+        verification_status: otherUser.verification_status,
+        lastMessage: lastMessageDoc ? {
+          content: lastMessageDoc.content,
+          messageType: lastMessageDoc.messageType,
+          createdAt: lastMessageDoc.createdAt,
+          isFromMe: isFromMe
+        } : null,
+        unreadCount: unreadCount,
+        matchedAt: match.updatedAt
+      };
+    });
 
     // Deduplicate conversations by userId (keep the one with the most recent lastMessage or matchedAt)
     const conversationMap = new Map();

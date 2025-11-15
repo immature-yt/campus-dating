@@ -1,5 +1,8 @@
-// Use NEXT_PUBLIC_API_URL (for Vercel) or fallback to localhost
-let backendUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+// Use NEXT_PUBLIC_API_URL (for Vercel) or fallback to production backend
+// For mobile app (Capacitor static export), default to production backend
+const productionBackendUrl = 'https://campus-dating-production.up.railway.app';
+
+let backendUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || productionBackendUrl;
 
 // Ensure URL has protocol (add https:// if missing)
 if (backendUrl && !backendUrl.startsWith('http://') && !backendUrl.startsWith('https://')) {
@@ -14,6 +17,8 @@ export const BACKEND_URL = backendUrl;
 // Debug: Always log backend URL in browser (helps diagnose production issues)
 if (typeof window !== 'undefined') {
   console.log('🔗 Backend URL:', BACKEND_URL);
+  console.log('🔗 Current Origin:', window.location.origin);
+  console.log('🔗 User Agent:', navigator.userAgent);
   if (!process.env.NEXT_PUBLIC_API_URL && !process.env.NEXT_PUBLIC_BACKEND_URL) {
     console.warn('⚠️ WARNING: NEXT_PUBLIC_API_URL not set! Using fallback:', BACKEND_URL);
     console.warn('⚠️ Set NEXT_PUBLIC_API_URL in Vercel environment variables!');

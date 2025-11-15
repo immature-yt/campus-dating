@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { getSocket } from '../lib/socket';
+import Peer from 'simple-peer';
 
 export default function VideoCall({ chatId, otherUserId, onEnd, isIncoming, callerName, onAccept, onReject }) {
   const [isMuted, setIsMuted] = useState(false);
@@ -10,6 +11,7 @@ export default function VideoCall({ chatId, otherUserId, onEnd, isIncoming, call
   const localStreamRef = useRef(null);
   const peerRef = useRef(null);
   const socketRef = useRef(null);
+  const pendingOfferRef = useRef(null);
 
   useEffect(() => {
     const socket = getSocket();
@@ -27,29 +29,79 @@ export default function VideoCall({ chatId, otherUserId, onEnd, isIncoming, call
           localVideoRef.current.srcObject = stream;
         }
 
-        // Create peer connection (simplified - in production use proper WebRTC)
-        if (!isIncoming) {
-          // Initiate call
-          console.log('Sending call offer:', { toUserId: otherUserId, chatId });
-          socket.emit('call:offer', {
-            toUserId: otherUserId,
-            offer: 'initiate',
-            chatId
-          });
-        }
+        // Create WebRTC peer connection
+        const peer = new Peer({
+          initiator: !isIncoming,
+          trickle: false,
+          stream: stream
+        });
 
-        // Handle call answer
-        socket.on('call:answer', ({ fromUserId, answer }) => {
-          if (fromUserId === otherUserId && answer === 'accepted') {
-            setCallAccepted(true);
+        peerRef.current = peer;
+
+        peer.on('signal', (data) => {
+          // Send signaling data to other user
+          if (!isIncoming) {
+            // Outgoing call - send as offer
+            socket.emit('call:offer', {
+              toUserId: otherUserId,
+              offer: data,
+              chatId
+            });
+          } else {
+            // Incoming call - send as answer
+            socket.emit('call:answer', {
+              toUserId: otherUserId,
+              answer: data,
+              chatId
+            });
           }
         });
 
-        socket.on('call:end', ({ fromUserId }) => {
-          if (fromUserId === otherUserId || !fromUserId) {
+        peer.on('stream', (remoteStream) => {
+          // Receive remote video stream
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = remoteStream;
+          }
+        });
+
+        peer.on('error', (err) => {
+          console.error('Peer error:', err);
+        });
+
+        peer.on('connect', () => {
+          console.log('Peer connection established!');
+        });
+
+        // Handle incoming offer (for incoming calls - when accepting)
+        if (isIncoming && pendingOfferRef.current) {
+          peer.signal(pendingOfferRef.current);
+          pendingOfferRef.current = null;
+        }
+
+        // Handle incoming answer (for outgoing calls)
+        if (!isIncoming) {
+          const handleAnswer = ({ fromUserId, answer, chatId: callChatId }) => {
+            if (fromUserId === otherUserId && callChatId === chatId && answer && typeof answer === 'object') {
+              if (peerRef.current) {
+                peerRef.current.signal(answer);
+              }
+            }
+          };
+          socket.on('call:answer', handleAnswer);
+        }
+
+        socket.on('call:ice-candidate', ({ fromUserId, candidate, chatId: callChatId }) => {
+          if (fromUserId === otherUserId && callChatId === chatId && candidate && peerRef.current) {
+            peerRef.current.signal(candidate);
+          }
+        });
+
+        socket.on('call:end', ({ fromUserId, chatId: callChatId }) => {
+          if ((fromUserId === otherUserId || !fromUserId) && (!callChatId || callChatId === chatId)) {
             endCall();
           }
         });
+
       } catch (error) {
         console.error('Error starting call:', error);
         alert('Failed to start video call. Please check camera/microphone permissions.');
@@ -57,36 +109,65 @@ export default function VideoCall({ chatId, otherUserId, onEnd, isIncoming, call
       }
     };
 
+    // Handle incoming offer before call is accepted
+    if (isIncoming) {
+      const handleIncomingOffer = ({ fromUserId, offer, chatId: callChatId }) => {
+        if (fromUserId === otherUserId && callChatId === chatId && offer && typeof offer === 'object') {
+          if (callAccepted && peerRef.current) {
+            // Call already accepted, signal immediately
+            peerRef.current.signal(offer);
+          } else {
+            // Store offer for when call is accepted
+            pendingOfferRef.current = offer;
+          }
+        }
+      };
+      socket.on('call:offer', handleIncomingOffer);
+    }
+
     if (callAccepted || !isIncoming) {
       startCall();
     }
 
     return () => {
+      if (peerRef.current) {
+        peerRef.current.destroy();
+        peerRef.current = null;
+      }
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(track => track.stop());
       }
+      socket.off('call:offer');
+      socket.off('call:answer');
+      socket.off('call:ice-candidate');
+      socket.off('call:end');
     };
   }, [chatId, otherUserId, isIncoming, callAccepted]);
 
   const endCall = () => {
+    if (peerRef.current) {
+      peerRef.current.destroy();
+      peerRef.current = null;
+    }
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => track.stop());
+      localStreamRef.current = null;
+    }
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = null;
     }
     if (socketRef.current) {
-      socketRef.current.emit('call:end', { toUserId: otherUserId });
+      socketRef.current.emit('call:end', { toUserId: otherUserId, chatId });
     }
     onEnd();
   };
 
-  const acceptCall = () => {
-    if (socketRef.current) {
-      socketRef.current.emit('call:answer', {
-        toUserId: otherUserId,
-        answer: 'accepted'
-      });
-    }
+  const acceptCall = async () => {
     setCallAccepted(true);
     if (onAccept) onAccept();
+    
+    // Start call will be triggered by useEffect when callAccepted changes
+    // The peer connection will be created and will send answer signal
   };
 
   const rejectCall = () => {

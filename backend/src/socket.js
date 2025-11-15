@@ -103,24 +103,50 @@ export function initializeSocket(server) {
       }
     });
 
-    socket.on('call:answer', ({ toUserId, answer }) => {
+    socket.on('call:answer', ({ toUserId, answer, chatId }) => {
       io.to(`user:${toUserId}`).emit('call:answer', {
         fromUserId: socket.userId,
-        answer
+        answer,
+        chatId
       });
+      // Also emit to chat room
+      if (chatId) {
+        io.to(`chat:${chatId}`).emit('call:answer', {
+          fromUserId: socket.userId,
+          answer,
+          chatId
+        });
+      }
     });
 
-    socket.on('call:ice-candidate', ({ toUserId, candidate }) => {
+    socket.on('call:ice-candidate', ({ toUserId, candidate, chatId }) => {
       io.to(`user:${toUserId}`).emit('call:ice-candidate', {
         fromUserId: socket.userId,
-        candidate
+        candidate,
+        chatId
       });
+      // Also emit to chat room
+      if (chatId) {
+        io.to(`chat:${chatId}`).emit('call:ice-candidate', {
+          fromUserId: socket.userId,
+          candidate,
+          chatId
+        });
+      }
     });
 
-    socket.on('call:end', ({ toUserId }) => {
+    socket.on('call:end', ({ toUserId, chatId }) => {
       io.to(`user:${toUserId}`).emit('call:end', {
-        fromUserId: socket.userId
+        fromUserId: socket.userId,
+        chatId
       });
+      // Also emit to chat room
+      if (chatId) {
+        io.to(`chat:${chatId}`).emit('call:end', {
+          fromUserId: socket.userId,
+          chatId
+        });
+      }
     });
 
     // Game events

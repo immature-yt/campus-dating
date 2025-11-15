@@ -183,10 +183,17 @@ export default function Chats() {
 
       // Handle incoming video call - listen globally for all calls
       const handleIncomingCall = ({ fromUserId, fromUserName, offer, chatId: callChatId }) => {
-        console.log('Incoming call received:', { fromUserId, fromUserName, callChatId, myId: me._id });
-        // Show call notification - always show if it's for us (fromUserId should be the other person)
-        setShowVideoCall(true);
-        setIncomingCallData({ fromUserId, fromUserName, chatId: callChatId });
+        console.log('Incoming call received:', { fromUserId, fromUserName, callChatId, myId: me._id, offerType: typeof offer });
+        // Only show call UI on initial offer (when offer is WebRTC signaling object, not string)
+        // If offer is an object, it's WebRTC signaling - show the call UI
+        if (offer && typeof offer === 'object' && !showVideoCall) {
+          setShowVideoCall(true);
+          setIncomingCallData({ fromUserId, fromUserName, chatId: callChatId });
+        } else if (offer === 'initiate' && !showVideoCall) {
+          // Legacy string-based offer
+          setShowVideoCall(true);
+          setIncomingCallData({ fromUserId, fromUserName, chatId: callChatId });
+        }
       };
 
       socket.on('call:offer', handleIncomingCall);

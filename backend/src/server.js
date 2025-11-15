@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import { createServer } from 'http';
 import { connectDb } from './db.js';
 import { config } from './config.js';
 import authRoutes from './routes/auth.js';
@@ -10,9 +11,11 @@ import adminRoutes from './routes/admin.js';
 import matchRoutes from './routes/match.js';
 import likesRoutes from './routes/likes.js';
 import messagesRoutes from './routes/messages.js';
+import gameRoutes from './routes/game.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 import { User } from './models/User.js';
 import bcrypt from 'bcryptjs';
+import { initializeSocket } from './socket.js';
 
 async function bootstrap() {
   await connectDb();
@@ -41,6 +44,13 @@ async function bootstrap() {
   }
 
   const app = express();
+  const server = createServer(app);
+  
+  // Initialize Socket.IO
+  const io = initializeSocket(server);
+  
+  // Make io available to routes if needed
+  app.set('io', io);
   
   // Root route - helpful info
   app.get('/', (req, res) => {
@@ -96,16 +106,18 @@ async function bootstrap() {
   app.use('/api/match', matchRoutes);
   app.use('/api/likes', likesRoutes);
   app.use('/api/messages', messagesRoutes);
+  app.use('/api/game', gameRoutes);
 
   app.use(notFound);
   app.use(errorHandler);
 
   const port = config.port || process.env.PORT || 5000;
-  app.listen(port, '0.0.0.0', () => {
+  server.listen(port, '0.0.0.0', () => {
     // eslint-disable-next-line no-console
     console.log(`Backend listening on port ${port}`);
     console.log(`Health endpoint: http://0.0.0.0:${port}/api/health`);
     console.log(`Frontend URL: ${config.frontendUrl || 'Not set'}`);
+    console.log(`WebSocket server initialized`);
   });
 }
 

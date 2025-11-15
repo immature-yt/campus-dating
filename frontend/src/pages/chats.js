@@ -1,6 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/router';
-import { apiGet, apiPost } from '../lib/api';
+import { apiGet, apiPost, apiDelete } from '../lib/api';
+import { getSocket } from '../lib/socket';
+import VideoCall from '../components/VideoCall';
+import TruthDareGame from '../components/TruthDareGame';
 
 // Custom Voice Note Player Component
 function VoiceNotePlayer({ audioUrl }) {
@@ -137,6 +140,11 @@ export default function Chats() {
   const [hoveredMessageId, setHoveredMessageId] = useState(null);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [messagesError, setMessagesError] = useState(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const [typingTimeout, setTypingTimeout] = useState(null);
+  const [showReactionPicker, setShowReactionPicker] = useState(null);
+  const [showVideoCall, setShowVideoCall] = useState(false);
+  const [showGame, setShowGame] = useState(false);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const streamRef = useRef(null);
@@ -144,7 +152,9 @@ export default function Chats() {
   const messagesEndRef = useRef(null);
   const imageInputRef = useRef(null);
   const videoInputRef = useRef(null);
-  const lastMessageSentRef = useRef(null); // Track when we last sent a message to prevent auto-refresh interference
+  const lastMessageSentRef = useRef(null);
+  const socketRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
 
   useEffect(() => {
     apiGet('/api/auth/me')
@@ -164,6 +174,57 @@ export default function Chats() {
       loadConversations();
     }
   }, [me]);
+
+  // Setup socket connection
+  useEffect(() => {
+    if (me) {
+      const socket = getSocket();
+      socketRef.current = socket;
+
+      // Join chat room when chatId is available
+      if (chatId) {
+        socket.emit('chat:join', { chatId });
+      }
+
+      // Handle typing indicators
+      socket.on('typing:start', ({ userId, userName }) => {
+        if (userId !== me._id) {
+          setIsTyping(true);
+        }
+      });
+
+      socket.on('typing:stop', ({ userId }) => {
+        if (userId !== me._id) {
+          setIsTyping(false);
+        }
+      });
+
+      // Handle incoming video call
+      socket.on('call:offer', ({ fromUserId, fromUserName, offer, chatId: callChatId }) => {
+        if (callChatId === chatId) {
+          // Show incoming call UI
+          setShowVideoCall(true);
+        }
+      });
+
+      // Handle game start
+      socket.on('game:start', ({ fromUserId, gameType }) => {
+        if (fromUserId === chatId) {
+          setShowGame(true);
+        }
+      });
+
+      return () => {
+        if (chatId) {
+          socket.emit('chat:leave', { chatId });
+        }
+        socket.off('typing:start');
+        socket.off('typing:stop');
+        socket.off('call:offer');
+        socket.off('game:start');
+      };
+    }
+  }, [me, chatId]);
 
   // Load messages for specific chat
   useEffect(() => {
@@ -189,6 +250,7 @@ export default function Chats() {
       setChatMessages([]);
       setMessagesError(null);
       lastMessageSentRef.current = null;
+      setIsTyping(false);
     }
   }, [chatId, me]);
 
@@ -273,7 +335,8 @@ export default function Chats() {
           replyToMessage: replyToMessage,
           isDelivered: msg.isDelivered || false,
           isRead: msg.isRead || false,
-          optimistic: false
+          optimistic: false,
+          reactions: msg.reactions || []
         };
       });
       
@@ -915,6 +978,61 @@ export default function Chats() {
     return chatMessages.find(m => m.id === replyToId);
   };
 
+  // Typing indicator handler
+  const handleInputChange = (e) => {
+    setInputText(e.target.value);
+    
+    if (chatId && socketRef.current) {
+      // Clear existing timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      
+      // Emit typing start
+      socketRef.current.emit('typing:start', { chatId });
+      
+      // Set timeout to stop typing after 2 seconds of inactivity
+      typingTimeoutRef.current = setTimeout(() => {
+        if (socketRef.current) {
+          socketRef.current.emit('typing:stop', { chatId });
+        }
+      }, 2000);
+    }
+  };
+
+  // Reaction handlers
+  const handleAddReaction = async (messageId, emoji) => {
+    try {
+      const response = await apiPost(`/api/messages/${messageId}/reaction`, { emoji });
+      // Update message in chatMessages
+      setChatMessages(prev => prev.map(msg => 
+        msg.id === messageId ? { ...msg, reactions: response.message.reactions } : msg
+      ));
+      setShowReactionPicker(null);
+    } catch (error) {
+      console.error('Error adding reaction:', error);
+    }
+  };
+
+  const handleRemoveReaction = async (messageId) => {
+    try {
+      const response = await apiDelete(`/api/messages/${messageId}/reaction`);
+      setChatMessages(prev => prev.map(msg => 
+        msg.id === messageId ? { ...msg, reactions: response.message.reactions } : msg
+      ));
+    } catch (error) {
+      console.error('Error removing reaction:', error);
+    }
+  };
+
+  const getReactionCount = (reactions, emoji) => {
+    return reactions?.filter(r => r.emoji === emoji).length || 0;
+  };
+
+  const hasUserReacted = (reactions, emoji) => {
+    return reactions?.some(r => r.emoji === emoji && r.userId?.toString() === me?._id?.toString());
+  };
+
   if (!me) {
     return (
       <div className="chats-page">
@@ -949,6 +1067,24 @@ export default function Chats() {
             </div>
           )}
           <h2>{chat?.name || 'Chat'}</h2>
+          <div style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto' }}>
+            <button 
+              type="button" 
+              className="back-btn" 
+              onClick={() => setShowVideoCall(true)}
+              title="Video Call"
+            >
+              📹
+            </button>
+            <button 
+              type="button" 
+              className="back-btn" 
+              onClick={() => setShowGame(true)}
+              title="Truth or Dare"
+            >
+              🎮
+            </button>
+          </div>
         </div>
         <div className="chat-messages">
           {isLoadingMessages && chatMessages.length === 0 && (
@@ -1018,6 +1154,18 @@ export default function Chats() {
                           <path d="M8 0L3 5h3v3h4V5h3L8 0zM0 9v7h16V9h-2v5H2V9H0z" fill="currentColor"/>
                         </svg>
                       </button>
+                      <button
+                        type="button"
+                        className="message-menu-btn"
+                        onClick={() => {
+                          setShowReactionPicker(showReactionPicker === msg.id ? null : msg.id);
+                          setHoveredMessageId(null);
+                        }}
+                        onMouseEnter={() => setHoveredMessageId(msg.id)}
+                        aria-label="React"
+                      >
+                        😊
+                      </button>
                     </div>
                   )}
                 </div>
@@ -1084,9 +1232,67 @@ export default function Chats() {
                     </span>
                   )}
                 </div>
+                {/* Message reactions */}
+                {msg.reactions && msg.reactions.length > 0 && (
+                  <div className="message-reactions">
+                    {['👍', '❤️', '😂', '😮', '😢', '🔥'].map(emoji => {
+                      const count = getReactionCount(msg.reactions, emoji);
+                      if (count === 0) return null;
+                      return (
+                        <div
+                          key={emoji}
+                          className={`reaction-badge ${hasUserReacted(msg.reactions, emoji) ? 'active' : ''}`}
+                          onClick={() => hasUserReacted(msg.reactions, emoji) 
+                            ? handleRemoveReaction(msg.id) 
+                            : handleAddReaction(msg.id, emoji)
+                          }
+                        >
+                          <span>{emoji}</span>
+                          <span>{count}</span>
+                        </div>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      className="reaction-badge"
+                      onClick={() => setShowReactionPicker(showReactionPicker === msg.id ? null : msg.id)}
+                      style={{ fontSize: '0.875rem' }}
+                    >
+                      +
+                    </button>
+                  </div>
+                )}
+                {showReactionPicker === msg.id && (
+                  <div className="reaction-picker">
+                    {['👍', '❤️', '😂', '😮', '😢', '🔥', '👏', '🎉'].map(emoji => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => handleAddReaction(msg.id, emoji)}
+                        style={{ 
+                          background: 'none', 
+                          border: 'none', 
+                          fontSize: '1.5rem', 
+                          cursor: 'pointer',
+                          padding: '0.25rem'
+                        }}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
+          {/* Typing indicator */}
+          {isTyping && (
+            <div className="typing-indicator">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          )}
           <div ref={messagesEndRef} />
         </div>
         <div className="chat-input">
@@ -1143,8 +1349,19 @@ export default function Chats() {
               type="text"
               placeholder="Type a message..."
               value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+              onChange={handleInputChange}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  sendMessage();
+                  // Stop typing indicator
+                  if (socketRef.current) {
+                    socketRef.current.emit('typing:stop', { chatId });
+                  }
+                  if (typingTimeoutRef.current) {
+                    clearTimeout(typingTimeoutRef.current);
+                  }
+                }
+              }}
             />
             <button
               type="button"
@@ -1193,6 +1410,24 @@ export default function Chats() {
             />
           </div>
         </div>
+        {/* Video Call Component */}
+        {showVideoCall && (
+          <VideoCall
+            chatId={chatId}
+            otherUserId={chatId}
+            onEnd={() => setShowVideoCall(false)}
+            isIncoming={false}
+          />
+        )}
+        {/* Truth/Dare Game Component */}
+        {showGame && (
+          <TruthDareGame
+            chatId={chatId}
+            otherUserId={chatId}
+            otherUserName={chat?.name}
+            onClose={() => setShowGame(false)}
+          />
+        )}
       </div>
     );
   }

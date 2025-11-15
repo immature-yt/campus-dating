@@ -188,6 +188,7 @@ router.get('/:userId', requireAuth, async (req, res) => {
     })
       .populate('fromUser', 'name email photos')
       .populate('toUser', 'name email photos')
+      .populate('reactions.userId', 'name')
       .populate({
         path: 'replyTo',
         select: 'content messageType mediaUrl fromUser',
@@ -287,6 +288,7 @@ router.post('/send', requireAuth, async (req, res) => {
     // Populate user info and replyTo before returning
     await message.populate('fromUser', 'name email photos');
     await message.populate('toUser', 'name email photos');
+    await message.populate('reactions.userId', 'name');
     if (replyToObjectId) {
       await message.populate({
         path: 'replyTo',
@@ -304,6 +306,76 @@ router.post('/send', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Error sending message:', error);
     return res.status(500).json({ error: 'Failed to send message' });
+  }
+});
+
+// Add reaction to message
+router.post('/:messageId/reaction', requireAuth, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { emoji } = req.body;
+
+    if (!emoji) {
+      return res.status(400).json({ error: 'Emoji is required' });
+    }
+
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
+    // Check if user is part of this conversation
+    const isParticipant = 
+      message.fromUser.toString() === req.user._id.toString() ||
+      message.toUser.toString() === req.user._id.toString();
+
+    if (!isParticipant) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    // Remove existing reaction from this user
+    message.reactions = message.reactions.filter(
+      r => r.userId.toString() !== req.user._id.toString()
+    );
+
+    // Add new reaction
+    message.reactions.push({
+      emoji,
+      userId: req.user._id
+    });
+
+    await message.save();
+    await message.populate('reactions.userId', 'name');
+
+    return res.json({ message });
+  } catch (error) {
+    console.error('Error adding reaction:', error);
+    return res.status(500).json({ error: 'Failed to add reaction' });
+  }
+});
+
+// Remove reaction from message
+router.delete('/:messageId/reaction', requireAuth, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
+    // Remove user's reaction
+    message.reactions = message.reactions.filter(
+      r => r.userId.toString() !== req.user._id.toString()
+    );
+
+    await message.save();
+    await message.populate('reactions.userId', 'name');
+
+    return res.json({ message });
+  } catch (error) {
+    console.error('Error removing reaction:', error);
+    return res.status(500).json({ error: 'Failed to remove reaction' });
   }
 });
 

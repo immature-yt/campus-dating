@@ -128,6 +128,30 @@ export async function apiPost(path, body) {
   }
 }
 
+export async function apiDelete(path) {
+  const token = getAuthToken();
+  const url = `${BACKEND_URL}${path}`;
+  
+  try {
+    const res = await fetch(url, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      }
+    });
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(errorText || `HTTP ${res.status}: ${res.statusText}`);
+    }
+    
+    return res.json();
+  } catch (error) {
+    throw error;
+  }
+}
+
 export async function apiForm(path, formData) {
   const token = getAuthToken();
   const res = await fetch(`${BACKEND_URL}${path}`, {

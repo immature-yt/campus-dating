@@ -2,7 +2,6 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { apiGet, apiPost, apiDelete } from '../lib/api';
 import { getSocket } from '../lib/socket';
-import VideoCall from '../components/VideoCall';
 
 // Custom Voice Note Player Component
 function VoiceNotePlayer({ audioUrl }) {
@@ -142,8 +141,6 @@ export default function Chats() {
   const [isTyping, setIsTyping] = useState(false);
   const [typingTimeout, setTypingTimeout] = useState(null);
   const [showReactionPicker, setShowReactionPicker] = useState(null);
-  const [showVideoCall, setShowVideoCall] = useState(false);
-  const [incomingCallData, setIncomingCallData] = useState(null);
   const [activeGame, setActiveGame] = useState(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -180,27 +177,7 @@ export default function Chats() {
     if (me) {
       const socket = getSocket();
       socketRef.current = socket;
-
-      // Handle incoming video call - listen globally for all calls
-      const handleIncomingCall = ({ fromUserId, fromUserName, offer, chatId: callChatId }) => {
-        console.log('Incoming call received:', { fromUserId, fromUserName, callChatId, myId: me._id, offerType: typeof offer });
-        // Only show call UI on initial offer (when offer is WebRTC signaling object, not string)
-        // If offer is an object, it's WebRTC signaling - show the call UI
-        if (offer && typeof offer === 'object' && !showVideoCall) {
-          setShowVideoCall(true);
-          setIncomingCallData({ fromUserId, fromUserName, chatId: callChatId });
-        } else if (offer === 'initiate' && !showVideoCall) {
-          // Legacy string-based offer
-          setShowVideoCall(true);
-          setIncomingCallData({ fromUserId, fromUserName, chatId: callChatId });
-        }
-      };
-
-      socket.on('call:offer', handleIncomingCall);
-
-      return () => {
-        socket.off('call:offer', handleIncomingCall);
-      };
+      // Global socket listeners can be added here if needed in the future
     }
   }, [me]); // Only depend on me, not chatId
 
@@ -1211,17 +1188,6 @@ export default function Chats() {
             <button 
               type="button" 
               className="back-btn" 
-              onClick={() => {
-                setShowVideoCall(true);
-                setIncomingCallData(null);
-              }}
-              title="Video Call"
-            >
-              📹
-            </button>
-            <button 
-              type="button" 
-              className="back-btn" 
               onClick={startTruthDareGame}
               title="Truth or Dare"
             >
@@ -1599,21 +1565,6 @@ export default function Chats() {
             />
           </div>
         </div>
-        {/* Video Call Component */}
-        {showVideoCall && (
-          <VideoCall
-            chatId={chatId || incomingCallData?.chatId}
-            otherUserId={incomingCallData?.fromUserId || chatId}
-            onEnd={() => {
-              setShowVideoCall(false);
-              setIncomingCallData(null);
-            }}
-            isIncoming={!!incomingCallData}
-            callerName={incomingCallData?.fromUserName || chat?.name}
-            onAccept={() => setIncomingCallData(null)}
-            onReject={() => setIncomingCallData(null)}
-          />
-        )}
       </div>
     );
   }
